@@ -1,0 +1,71 @@
+model:
+  vision_encoder:
+    type: "vit_small"
+    patch_size: 16
+    hidden_dim: 512
+    num_layers: 12
+    num_heads: 8
+  text_encoder:
+    type: "bert_small"
+    hidden_dim: 512
+    num_layers: 12
+    num_heads: 8
+  fusion:
+    type: "early"
+    hidden_dim: 512
+    num_layers: 6
+    num_heads: 8
+  double_loop:
+    controller_type: "lstm"
+    hidden_dim: 256
+    update_frequency: 100
+    meta_lr: 1e-5
+  heads:
+    num_classes: 1000  # For ImageNet-like
+    hidden_dim: 512
+
+training:
+  micro_batch_size: 4
+  gradient_accumulation: 8
+  max_epochs: 50
+  inner_lr: 3e-4
+  warmup_steps: 1000
+  mixed_precision: "bf16"
+  gradient_checkpointing: true
+  optimizer: "adamw"
+  scheduler: "cosine"
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+
+data:
+  train_dataset: "coco_captions"
+  val_dataset: "coco_captions"
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+
+wolfram:
+  api_key: "${WOLFRAM_API_KEY}"
+  cache_dir: "./cache/wolfram"
+  max_queries_per_day: 2000
+  validation_weight: 0.15
+  timeout: 30
+
+logging:
+  project: "multi-modal-net"
+  experiment: "default"
+  log_every: 50
+  save_every: 5000
+  eval_every: 10000
+
+hardware:
+  device: "cuda"
+  max_memory: "11GB"
+  compile_model: true
+  ddp: false
+
+paths:
+  output_dir: "./outputs"
+  checkpoint_dir: "./checkpoints"
+  log_dir: "./logs"

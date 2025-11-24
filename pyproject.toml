@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-modal-neural-net"
+version = "0.1.0"
+description = "Open-source multi-modal small neural network with double-loop learning and Wolfram Alpha integration"
+authors = [
+    {name = "Product Development Team", email = "team@example.com"},
+]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1.0",
+    "torchvision>=0.16.0",
+    "transformers>=4.35.0",
+    "datasets>=2.14.0",
+    "webdataset>=0.2.0",
+    "wandb>=0.15.0",
+    "redis>=4.5.0",
+    "diskcache>=5.6.0",
+    "wolframalpha>=5.0.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "pyyaml>=6.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "scikit-learn>=1.3.0",
+    "tqdm>=4.65.0",
+    "requests>=2.31.0",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "jupyter>=1.0.0",
+    "notebook>=6.5.0",
+    "sphinx>=7.0.0",
+    "autodoc>=0.16.0",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "autodoc>=0.16.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/multi-modal-neural-net"
+Repository = "https://github.com/yourusername/multi-modal-neural-net"
+Issues = "https://github.com/yourusername/multi-modal-neural-net/issues"
+Documentation = "https://multi-modal-neural-net.readthedocs.io/"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
