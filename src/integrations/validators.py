@@ -82,7 +82,7 @@ class ContentValidator:
             except KeyError as e:
                 raise AttributeError(name) from e
 
-    def validate_content(self, content: str) -> Dict[str, Any]:
+    def validate_content(self, content: str) -> "ContentValidator.ValidationResult":
         """Validate content quality and extract metadata.
 
         Args:

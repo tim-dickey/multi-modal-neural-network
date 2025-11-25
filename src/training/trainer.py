@@ -101,6 +101,9 @@ class Trainer:
         log_model_info(self.logger, self.model)
 
         # Resolve data loaders
+        # Declare loader attributes once for consistent typing
+        self.train_loader: Any
+        self.val_loader: Optional[Any]
         if train_loader is None and val_loader is None:
             self.logger.info("Loading datasets...")
             train_dataset, val_dataset = create_dataset_from_config(self.config)
@@ -128,7 +131,7 @@ class Trainer:
                 pass
         else:
             # Use provided loaders as-is; do not auto-create datasets
-            self.train_loader = train_loader if train_loader is not None else []  # type: ignore
+            self.train_loader = train_loader if train_loader is not None else []
             self.val_loader = val_loader
 
         # Create loss function
@@ -226,7 +229,7 @@ class Trainer:
         self.model.train()
 
         total_loss = 0.0
-        total_correct = 0
+        total_correct: float = 0.0
         total_samples = 0
 
         progress_bar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch}")
@@ -363,7 +366,7 @@ class Trainer:
         self.model.eval()
 
         total_loss = 0.0
-        total_correct = 0
+        total_correct: float = 0.0
         total_samples = 0
 
         for batch in tqdm(self.val_loader, desc="Validating"):

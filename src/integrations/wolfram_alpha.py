@@ -216,8 +216,8 @@ class WolframKnowledgeInjector(KnowledgeInjector):
                 r'\d+\s*=\s*\d+',               # Numeric equations (e.g., 2 = 4)
             ]
 
-            expressions = []
-            seen = set()
+            expressions: list[str] = []
+            seen: set[str] = set()
             # Preserve input order by iterating with finditer across patterns in sequence
             for pattern in patterns:
                 for m in re.finditer(pattern, input_data):

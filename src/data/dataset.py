@@ -2,12 +2,35 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast, Protocol, TYPE_CHECKING, Iterable
 
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+
+if TYPE_CHECKING:
+    from pycocotools.coco import COCO as _COCO
+
+
+class CocoLike(Protocol):
+    def getCatIds(self) -> Iterable[int]:
+        ...
+
+    def getImgIds(self) -> Iterable[int]:
+        ...
+
+    def loadAnns(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
+        ...
+
+    def loadCats(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
+        ...
+
+    def loadImgs(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
+        ...
+
+
+COCOType = "_COCO | CocoLike"
 
 
 class MultiModalDataset(Dataset):
@@ -44,13 +67,18 @@ class MultiModalDataset(Dataset):
             self.data_path / f"{self.split}.json",
             self.data_path / f"annotations_{self.split}.json",
         ]
-        
+
         for annotation_file in possible_files:
             if annotation_file.exists():
-                with open(annotation_file, "r") as f:
-                    data = cast(List[Dict[str, Any]], json.load(f))
-                return data
-        
+                try:
+                    with open(annotation_file, "r", encoding="utf-8") as f:
+                        data = cast(List[Dict[str, Any]], json.load(f))
+                    return data
+                except (json.JSONDecodeError, OSError, ValueError) as e:
+                    # Malformed JSON or IO issue; try next file or fallback
+                    print(f"Failed to read annotations from {annotation_file}: {e}")
+                    continue
+
         # Return dummy data for demonstration
         return [
             {
@@ -93,10 +121,12 @@ class MultiModalDataset(Dataset):
         """Load and return PIL Image."""
         full_path = self.data_path / image_path
         if full_path.exists():
-            return Image.open(full_path).convert("RGB")
-        else:
-            # Return dummy image for demonstration
-            return Image.new("RGB", (self.img_size, self.img_size), color="gray")
+            try:
+                return Image.open(full_path).convert("RGB")
+            except (OSError, ValueError) as e:
+                print(f"Failed to open image {full_path}: {e}")
+        # Return dummy image for demonstration
+        return Image.new("RGB", (self.img_size, self.img_size), color="gray")
 
     def _tokenize_text(self, text: str) -> Dict[str, torch.Tensor]:
         """Tokenize text input."""
@@ -204,9 +234,12 @@ class COCOCaptionsDataset(MultiModalDataset):
                     )
 
             return samples
-        except Exception:
-            # Fallback to parent implementation
+        except (FileNotFoundError, OSError, KeyError, ValueError, ImportError):
+            # Expected data/IO/import issues: fallback to parent implementation
             return super()._load_annotations()
+        except Exception:
+            # Unexpected error: don't silently swallow it
+            raise
 
 
 class ImageNetDataset(Dataset):
@@ -279,7 +312,7 @@ class ImageNetDataset(Dataset):
 
         try:
             image = Image.open(img_path).convert("RGB")
-        except Exception:
+        except (OSError, FileNotFoundError, ValueError):
             image = Image.new("RGB", (self.img_size, self.img_size))
 
         image = self.transform(image)
@@ -331,8 +364,9 @@ def create_dataset_from_config(config: Dict) -> Tuple[Dataset, Dataset]:
         from transformers import AutoTokenizer
 
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    except Exception:
-        pass
+    except (ImportError, OSError, ValueError):
+        # Missing dependency or local/IO error when loading pretrained tokenizer
+        tokenizer = None
 
     train_dataset: Dataset
     val_dataset: Dataset
