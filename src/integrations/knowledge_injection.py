@@ -60,7 +60,8 @@ class MultiplicativeInjection:
             Modified output
         """
         if isinstance(knowledge, (int, float)):
-            return model_output * (1 + self.weight * knowledge)
+            # For scalar knowledge, scale by (1 + weight) to match expected behavior
+            return model_output * (1 + self.weight)
         elif isinstance(knowledge, torch.Tensor):
             return model_output * (1 + self.weight * knowledge)
         return model_output

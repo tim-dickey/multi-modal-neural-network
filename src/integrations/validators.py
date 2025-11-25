@@ -1,6 +1,7 @@
 """Validation utilities for API responses and knowledge injection."""
 
 from typing import Any, Dict, Optional
+from collections import UserDict
 import re
 from .base import APIResponse
 
@@ -72,6 +73,15 @@ class ContentValidator:
         self.min_confidence = self.config.get('min_confidence', 0.5)
         self.max_length = self.config.get('max_length', 10000)
 
+    class ValidationResult(UserDict):
+        """Dict-like result that also allows attribute access (e.g., .valid)."""
+
+        def __getattr__(self, name: str) -> Any:
+            try:
+                return self.data[name]
+            except KeyError as e:
+                raise AttributeError(name) from e
+
     def validate_content(self, content: str) -> Dict[str, Any]:
         """Validate content quality and extract metadata.
 
@@ -82,29 +92,29 @@ class ContentValidator:
             Dictionary with validation results and metadata
         """
         if not content or not isinstance(content, str):
-            return {
+            return self.ValidationResult({
                 "valid": False,
                 "reason": "Empty or invalid content",
                 "confidence": 0.0
-            }
+            })
 
         if len(content) > self.max_length:
-            return {
+            return self.ValidationResult({
                 "valid": False,
                 "reason": f"Content too long ({len(content)} > {self.max_length})",
                 "confidence": 0.0
-            }
+            })
 
         # Basic quality checks
         quality_score = self._calculate_quality_score(content)
 
-        return {
+        return self.ValidationResult({
             "valid": quality_score >= self.min_confidence,
             "confidence": quality_score,
             "length": len(content),
             "has_numbers": bool(re.search(r'\d', content)),
             "has_text": len(content.strip()) > 0
-        }
+        })
 
     def _calculate_quality_score(self, content: str) -> float:
         """Calculate a quality score for the content.

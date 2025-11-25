@@ -193,3 +193,7 @@ results/
 
 # Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
+
+# Allow tracking of source model code (override generic models/ ignore)
+!src/models/
+!src/models/*

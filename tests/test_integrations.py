@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from typing import Dict, Any
 import asyncio
+import torch
 
 from src.integrations.base import APIIntegration, APIResponse, KnowledgeInjector
 from src.integrations.wolfram_alpha import WolframAlphaIntegration, WolframKnowledgeInjector

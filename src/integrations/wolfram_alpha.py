@@ -209,17 +209,26 @@ class WolframKnowledgeInjector(KnowledgeInjector):
         if isinstance(input_data, str):
             # Look for common math patterns
             patterns = [
-                r'\d+\s*[\+\-\*\/]\s*\d+',  # Basic arithmetic
-                r'\d+\^\d+',  # Exponents
-                r'sqrt\(\d+\)',  # Square roots
-                r'\d+\s*=\s*\d+',  # Equations
+                r'\d+\s*[\+\-\*\/]\s*\d+',  # Basic arithmetic (e.g., 3*4, 5-2)
+                r'\d+\s*\^\s*\d+',             # Numeric exponents (e.g., 2^3)
+                r'[A-Za-z][A-Za-z0-9_]*\s*\^\s*\d+\s*=\s*\d+',  # Variable exponent equations (e.g., x^2 = 4)
+                r'sqrt\(\d+\)',                  # Square roots (e.g., sqrt(16))
+                r'\d+\s*=\s*\d+',               # Numeric equations (e.g., 2 = 4)
             ]
 
             expressions = []
+            seen = set()
+            # Preserve input order by iterating with finditer across patterns in sequence
             for pattern in patterns:
-                matches = re.findall(pattern, input_data)
-                expressions.extend(matches)
+                for m in re.finditer(pattern, input_data):
+                    expr = m.group(0)
+                    # Skip if this expr is a substring of any previously captured expression
+                    if any(expr in prev for prev in expressions):
+                        continue
+                    if expr not in seen:
+                        seen.add(expr)
+                        expressions.append(expr)
 
-            return list(set(expressions))  # Remove duplicates
+            return expressions
 
         return []

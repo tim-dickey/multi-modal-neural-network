@@ -54,11 +54,11 @@ dev = [
     "jupyter>=1.0.0",
     "notebook>=6.5.0",
     "sphinx>=7.0.0",
-    "autodoc>=0.16.0",
+    "sphinx-autodoc-typehints>=1.24.0",
 ]
 docs = [
     "sphinx>=7.0.0",
-    "autodoc>=0.16.0",
+    "sphinx-autodoc-typehints>=1.24.0",
 ]
 # API Integration dependencies
 wolfram = [

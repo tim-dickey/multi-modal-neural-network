@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from .double_loop_controller import create_double_loop_controller
 from .fusion_layer import create_fusion_layer
-from .heads import create_task_head
+from .heads import create_task_head, MultiTaskHead
 from .text_encoder import create_text_encoder
 from .vision_encoder import create_vision_encoder
 
@@ -155,19 +155,26 @@ class MultiModalModel(nn.Module):
                 outputs["meta_info"] = None
 
         # Task prediction
-        if hasattr(self.task_head, "forward"):
-            # Check if it's a contrastive head that needs both modalities
-            if task_name == "contrastive" or (
-                hasattr(self.task_head, "__class__")
-                and self.task_head.__class__.__name__ == "ContrastiveHead"
-            ):
-                logits = self.task_head(vision_cls, text_cls)
-            else:
-                logits = self.task_head(pooled_features)
+        if isinstance(self.task_head, MultiTaskHead) or (
+            hasattr(self.task_head, "__class__") and self.task_head.__class__.__name__ == "MultiTaskHead"
+        ):
+            # Return a dict of task outputs
+            task_outputs = self.task_head(pooled_features, task_name=task_name)
+            outputs.update(task_outputs)
         else:
-            logits = pooled_features
+            if hasattr(self.task_head, "forward"):
+                # Check if it's a contrastive head that needs both modalities
+                if task_name == "contrastive" or (
+                    hasattr(self.task_head, "__class__")
+                    and self.task_head.__class__.__name__ == "ContrastiveHead"
+                ):
+                    logits = self.task_head(vision_cls, text_cls)
+                else:
+                    logits = self.task_head(pooled_features)
+            else:
+                logits = pooled_features
 
-        outputs["logits"] = logits
+            outputs["logits"] = logits
 
         # Return intermediate features if requested
         if return_features:
@@ -240,12 +247,23 @@ def create_multi_modal_model(config: Dict) -> MultiModalModel:
     """
     model_config = config.get("model", {})
 
+    # Allow aliasing via `model.head_type` and `model.task_configs`
+    head_config = dict(model_config.get("heads", {}))
+    alias_head_type = model_config.get("head_type")
+    if alias_head_type is not None:
+        # Normalize alias values (tests may use 'multi_task')
+        normalized = alias_head_type.replace("_", "")
+        head_config["type"] = "multitask" if normalized == "multitask" else alias_head_type
+    alias_tasks = model_config.get("task_configs")
+    if alias_tasks is not None:
+        head_config["tasks"] = alias_tasks
+
     return MultiModalModel(
         vision_config=model_config.get("vision_encoder", {}),
         text_config=model_config.get("text_encoder", {}),
         fusion_config=model_config.get("fusion", {}),
         double_loop_config=model_config.get("double_loop", {}),
-        head_config=model_config.get("heads", {}),
+        head_config=head_config,
         use_double_loop=model_config.get("use_double_loop", True),
         gradient_checkpointing=config.get("training", {}).get(
             "gradient_checkpointing", False
