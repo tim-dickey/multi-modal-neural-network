@@ -25,3 +25,12 @@ scipy>=1.11.0
 scikit-learn>=1.3.0
 tqdm>=4.65.0
 requests>=2.31.0
+# Future API integrations
+openai>=1.0.0
+google-generativeai>=0.3.0
+anthropic>=0.7.0
+huggingface-hub>=0.17.0
+# Additional utilities
+python-dotenv>=1.0.0
+aiohttp>=3.9.0
+httpx>=0.25.0

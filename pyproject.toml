@@ -60,6 +60,32 @@ docs = [
     "sphinx>=7.0.0",
     "autodoc>=0.16.0",
 ]
+# API Integration dependencies
+wolfram = [
+    "wolframalpha>=5.0.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+google = [
+    "google-generativeai>=0.3.0",
+]
+anthropic = [
+    "anthropic>=0.7.0",
+]
+huggingface = [
+    "huggingface-hub>=0.17.0",
+]
+all-apis = [
+    "wolframalpha>=5.0.0",
+    "openai>=1.0.0",
+    "google-generativeai>=0.3.0",
+    "anthropic>=0.7.0",
+    "huggingface-hub>=0.17.0",
+    "python-dotenv>=1.0.0",
+    "aiohttp>=3.9.0",
+    "httpx>=0.25.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/yourusername/multi-modal-neural-net"

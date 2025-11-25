@@ -1,6 +1,6 @@
 """Task-specific prediction heads for multi-modal model."""
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, Union, Tuple, cast
 
 import torch
 import torch.nn as nn
@@ -20,7 +20,7 @@ class ClassificationHead(nn.Module):
         self.use_intermediate_layer = use_intermediate_layer
 
         if use_intermediate_layer:
-            self.head = nn.Sequential(
+            self.head: Union[nn.Sequential, nn.Linear] = nn.Sequential(
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
@@ -36,7 +36,7 @@ class ClassificationHead(nn.Module):
         Returns:
             logits: (batch_size, num_classes)
         """
-        return self.head(x)
+        return self.head(x)  # type: ignore[no-any-return]
 
 
 class RegressionHead(nn.Module):
@@ -60,7 +60,7 @@ class RegressionHead(nn.Module):
         Returns:
             predictions: (batch_size, output_dim)
         """
-        return self.head(x)
+        return self.head(x)  # type: ignore[no-any-return]
 
 
 class MultiLabelHead(nn.Module):
@@ -85,7 +85,7 @@ class MultiLabelHead(nn.Module):
         Returns:
             probabilities: (batch_size, num_labels)
         """
-        return self.head(x)
+        return self.head(x)  # type: ignore[no-any-return]
 
 
 class ContrastiveHead(nn.Module):
@@ -116,7 +116,7 @@ class ContrastiveHead(nn.Module):
         image_features: torch.Tensor,
         text_features: torch.Tensor,
         return_similarity: bool = True,
-    ) -> torch.Tensor:
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Args:
             image_features: (batch_size, hidden_dim)
@@ -143,7 +143,7 @@ class ContrastiveHead(nn.Module):
         logit_scale = self.logit_scale.exp()
         similarity = logit_scale * image_proj @ text_proj.t()
 
-        return similarity
+        return similarity  # type: ignore[no-any-return]
 
 
 class SequenceGenerationHead(nn.Module):
@@ -182,6 +182,7 @@ class SequenceGenerationHead(nn.Module):
         self.register_buffer(
             "position_ids", torch.arange(max_seq_length).expand((1, -1))
         )
+        self.position_ids: torch.Tensor
 
     def forward(
         self,
@@ -226,7 +227,7 @@ class SequenceGenerationHead(nn.Module):
         # Project to vocabulary
         logits = self.output_proj(decoder_output)
 
-        return logits
+        return logits  # type: ignore[no-any-return]
 
 
 class MultiTaskHead(nn.Module):
@@ -248,6 +249,8 @@ class MultiTaskHead(nn.Module):
 
         for task_name, task_config in tasks.items():
             task_type = task_config.get("type", "classification")
+
+            head: Union[ClassificationHead, RegressionHead, MultiLabelHead, ContrastiveHead]
 
             if task_type == "classification":
                 head = ClassificationHead(
@@ -279,7 +282,7 @@ class MultiTaskHead(nn.Module):
             self.heads[task_name] = head
 
     def forward(
-        self, features: torch.Tensor, task_name: Optional[str] = None, **kwargs
+        self, features: torch.Tensor, task_name: Optional[str] = None, **kwargs: Any
     ) -> Dict[str, torch.Tensor]:
         """
         Args:
@@ -298,7 +301,7 @@ class MultiTaskHead(nn.Module):
             return outputs
 
 
-def create_task_head(config: dict) -> nn.Module:
+def create_task_head(config: Dict[str, Any]) -> nn.Module:
     """Factory function to create task head from config."""
     head_type = config.get("type", "classification")
 

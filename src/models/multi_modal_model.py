@@ -1,6 +1,6 @@
 """Main multi-modal neural network model with double-loop learning."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -98,7 +98,7 @@ class MultiModalModel(nn.Module):
                 - features: intermediate features (if return_features=True)
                 - meta_info: double-loop controller info (if enabled)
         """
-        batch_size = images.shape[0] if images is not None else input_ids.shape[0]
+        batch_size = images.shape[0] if images is not None else input_ids.shape[0]  # type: ignore
         outputs = {}
 
         # Encode vision
@@ -188,22 +188,22 @@ class MultiModalModel(nn.Module):
         else:
             return sum(p.numel() for p in self.parameters())
 
-    def freeze_vision_encoder(self):
+    def freeze_vision_encoder(self) -> None:
         """Freeze vision encoder parameters."""
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
 
-    def freeze_text_encoder(self):
+    def freeze_text_encoder(self) -> None:
         """Freeze text encoder parameters."""
         for param in self.text_encoder.parameters():
             param.requires_grad = False
 
-    def unfreeze_all(self):
+    def unfreeze_all(self) -> None:
         """Unfreeze all parameters."""
         for param in self.parameters():
             param.requires_grad = True
 
-    def enable_gradient_checkpointing(self):
+    def enable_gradient_checkpointing(self) -> None:
         """Enable gradient checkpointing for memory efficiency."""
         self.gradient_checkpointing = True
         # Note: Actual implementation would need to use torch.utils.checkpoint

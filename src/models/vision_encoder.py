@@ -1,6 +1,6 @@
 """Vision Transformer (ViT) encoder for image processing."""
 
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 import torch
 import torch.nn as nn
@@ -169,7 +169,7 @@ class VisionEncoder(nn.Module):
         # Initialize weights
         self._init_weights()
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize model weights."""
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
         if self.use_cls_token:
@@ -184,7 +184,7 @@ class VisionEncoder(nn.Module):
                 nn.init.constant_(m.bias, 0)
                 nn.init.constant_(m.weight, 1.0)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> Tuple[Optional[torch.Tensor], torch.Tensor]:
         """
         Args:
             x: (batch_size, in_channels, img_size, img_size)
@@ -227,7 +227,7 @@ class VisionEncoder(nn.Module):
         raise NotImplementedError("Attention map extraction not yet implemented")
 
 
-def create_vision_encoder(config: dict) -> VisionEncoder:
+def create_vision_encoder(config: Dict[str, Any]) -> VisionEncoder:
     """Factory function to create vision encoder from config."""
     return VisionEncoder(
         img_size=config.get("img_size", 224),

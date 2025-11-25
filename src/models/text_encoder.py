@@ -1,7 +1,7 @@
 """BERT-based text encoder for text processing."""
 
 import math
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -29,6 +29,7 @@ class TextEmbedding(nn.Module):
         self.register_buffer(
             "position_ids", torch.arange(max_seq_length).expand((1, -1))
         )
+        self.position_ids: torch.Tensor
 
     def forward(
         self, input_ids: torch.Tensor, token_type_ids: Optional[torch.Tensor] = None
@@ -55,7 +56,7 @@ class TextEmbedding(nn.Module):
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
-        return embeddings
+        return embeddings  # type: ignore[no-any-return]
 
 
 class TextMultiHeadAttention(nn.Module):
@@ -124,7 +125,7 @@ class TextMultiHeadAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_dropout(x)
 
-        return x
+        return x  # type: ignore[no-any-return]
 
 
 class TextTransformerBlock(nn.Module):
@@ -212,7 +213,7 @@ class TextEncoder(nn.Module):
 
         self._init_weights()
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize model weights."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -269,11 +270,11 @@ class TextEncoder(nn.Module):
                 pooled = hidden_states.mean(dim=1)
             return pooled, hidden_states
 
-    def get_input_embeddings(self):
+    def get_input_embeddings(self) -> nn.Embedding:
         """Get the token embedding layer."""
         return self.embeddings.token_embed
 
-    def set_input_embeddings(self, value):
+    def set_input_embeddings(self, value: nn.Embedding) -> None:
         """Set the token embedding layer."""
         self.embeddings.token_embed = value
 
@@ -291,7 +292,7 @@ class SimpleTokenizer:
         self.sep_token_id = 2
         self.unk_token_id = 3
 
-    def encode(self, text: str, max_length: int = 512) -> dict:
+    def encode(self, text: str, max_length: int = 512) -> Dict[str, torch.Tensor]:
         """Encode text to input IDs."""
         # Simple character-based encoding (for demo only)
         input_ids = [self.cls_token_id]
@@ -315,7 +316,7 @@ class SimpleTokenizer:
         }
 
 
-def create_text_encoder(config: dict) -> TextEncoder:
+def create_text_encoder(config: Dict[str, Any]) -> TextEncoder:
     """Factory function to create text encoder from config."""
     return TextEncoder(
         vocab_size=config.get("vocab_size", 30522),

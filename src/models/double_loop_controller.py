@@ -1,6 +1,6 @@
 """Double-loop learning controller for meta-learning and structural adaptation."""
 
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import torch
 import torch.nn as nn
@@ -55,9 +55,9 @@ class LSTMMetaController(nn.Module):
             nn.Linear(controller_hidden_dim, 64), nn.ReLU(), nn.Linear(64, 1)
         )
 
-        self.hidden_state = None
+        self.hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
 
-    def reset_state(self):
+    def reset_state(self) -> None:
         """Reset the LSTM hidden state."""
         self.hidden_state = None
 
@@ -189,7 +189,7 @@ class DoubleLoopController(nn.Module):
 
     def compute_meta_gradient(
         self, model: nn.Module, loss: torch.Tensor, accuracy: torch.Tensor
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Union[float, torch.Tensor]]:
         """
         Compute meta-gradients for controller update.
 
@@ -228,7 +228,7 @@ class DoubleLoopController(nn.Module):
                 "accuracy_variance": torch.tensor(0.0),
             }
 
-        return meta_metrics
+        return cast(Dict[str, Union[float, torch.Tensor]], meta_metrics)
 
     def forward(
         self,
@@ -236,7 +236,7 @@ class DoubleLoopController(nn.Module):
         loss: torch.Tensor,
         accuracy: torch.Tensor,
         gradient_norm: torch.Tensor,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Any]:
         """
         Generate adaptation signals from meta-controller.
 
@@ -262,7 +262,7 @@ class DoubleLoopController(nn.Module):
             "should_update_meta": self.should_update_meta(),
         }
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset controller state."""
         self.meta_controller.reset_state()
         self.step_count = 0
@@ -270,7 +270,7 @@ class DoubleLoopController(nn.Module):
         self.accuracy_history = []
 
 
-def create_double_loop_controller(config: dict) -> DoubleLoopController:
+def create_double_loop_controller(config: Dict[str, Any]) -> DoubleLoopController:
     """Factory function to create double-loop controller from config."""
     return DoubleLoopController(
         model_hidden_dim=config.get("model_hidden_dim", 512),

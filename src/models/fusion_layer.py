@@ -1,7 +1,7 @@
 """Multi-modal fusion layer for combining image and text features."""
 
 import math
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -76,7 +76,7 @@ class CrossModalAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_dropout(x)
 
-        return x
+        return x  # type: ignore[no-any-return]
 
 
 class FusionTransformerBlock(nn.Module):
@@ -168,7 +168,7 @@ class EarlyFusionLayer(nn.Module):
 
         self._init_weights()
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         nn.init.trunc_normal_(self.modality_embed, std=0.02)
 
     def forward(
@@ -176,7 +176,7 @@ class EarlyFusionLayer(nn.Module):
         vision_features: torch.Tensor,
         text_features: torch.Tensor,
         text_mask: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, int]:
         """
         Args:
             vision_features: (batch_size, num_patches, hidden_dim)
@@ -296,6 +296,7 @@ class FusionLayer(nn.Module):
     ):
         super().__init__()
         self.fusion_type = fusion_type
+        self.fusion: Union[EarlyFusionLayer, LateFusionLayer]
 
         if fusion_type == "early":
             self.fusion = EarlyFusionLayer(
@@ -332,14 +333,14 @@ class FusionLayer(nn.Module):
             vision_seq_len: only for early fusion
         """
         if self.fusion_type == "early":
-            return self.fusion(vision_features, text_features, text_mask)
+            return self.fusion(vision_features, text_features, text_mask)  # type: ignore[no-any-return]
         else:  # late fusion
             assert vision_pooled is not None and text_pooled is not None
             fused = self.fusion(vision_pooled, text_pooled)
             return fused, None
 
 
-def create_fusion_layer(config: dict) -> FusionLayer:
+def create_fusion_layer(config: Dict[str, Any]) -> FusionLayer:
     """Factory function to create fusion layer from config."""
     return FusionLayer(
         fusion_type=config.get("type", "early"),
