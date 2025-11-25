@@ -709,6 +709,76 @@ training:
 
 4. **Multi-GPU**: Coming soon
 
+## Development & Code Quality
+
+### Type Safety
+
+The codebase maintains complete type safety with comprehensive mypy integration. Before committing changes, always run type checking:
+
+```bash
+# Check all source files
+mypy src/ --show-error-codes
+
+# Check with cache for faster runs
+mypy src/ --cache-dir /tmp/mypy_cache --show-error-codes
+
+# Check specific module
+mypy src/models/ --show-error-codes
+```
+
+**Type Safety Benefits:**
+- Prevents runtime type errors through static analysis
+- Provides better IDE support and autocomplete
+- Serves as inline documentation for APIs
+- Enables safer refactoring and maintenance
+
+### Code Formatting
+
+Maintain consistent code style using the provided tools:
+
+```bash
+# Format Python code
+black src/ tests/
+
+# Sort imports
+isort src/ tests/
+
+# Check style compliance
+flake8 src/ tests/
+```
+
+### Testing
+
+Run the test suite to ensure code quality:
+
+```bash
+# Run all tests
+pytest tests/
+
+# Run with coverage
+pytest tests/ --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/test_trainer.py
+```
+
+### Pre-commit Checks
+
+Before pushing changes, run the full quality check:
+
+```bash
+# Type check
+mypy src/ --show-error-codes
+
+# Format and lint
+black src/ tests/
+isort src/ tests/
+flake8 src/ tests/
+
+# Run tests
+pytest tests/
+```
+
 ## Troubleshooting
 
 ### Out of Memory
