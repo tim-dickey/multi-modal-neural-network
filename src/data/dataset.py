@@ -1,0 +1,325 @@
+"""Dataset loading and preprocessing for multi-modal training."""
+
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from typing import Dict, Optional, Tuple, Any, List
+import json
+from pathlib import Path
+from PIL import Image
+import numpy as np
+
+
+class MultiModalDataset(Dataset):
+    """Base dataset class for multi-modal image-text data."""
+    
+    def __init__(
+        self,
+        data_path: str,
+        split: str = 'train',
+        img_size: int = 224,
+        max_text_length: int = 512,
+        tokenizer = None,
+        augment: bool = True
+    ):
+        super().__init__()
+        self.data_path = Path(data_path)
+        self.split = split
+        self.img_size = img_size
+        self.max_text_length = max_text_length
+        self.tokenizer = tokenizer
+        self.augment = augment and (split == 'train')
+        
+        # Load annotations
+        self.samples = self._load_annotations()
+        
+        # Image transformations
+        self.transform = self._get_transforms()
+        
+    def _load_annotations(self) -> List[Dict]:
+        """Load dataset annotations."""
+        # This is a placeholder - implement based on your dataset format
+        # For example, COCO format or custom JSON
+        annotation_file = self.data_path / f"{self.split}.json"
+        
+        if annotation_file.exists():
+            with open(annotation_file, 'r') as f:
+                data = json.load(f)
+            return data
+        else:
+            # Return dummy data for demonstration
+            return [
+                {
+                    'image_path': 'image_0.jpg',
+                    'caption': 'A sample image caption',
+                    'label': 0
+                }
+            ]
+            
+    def _get_transforms(self):
+        """Get image transformations."""
+        if self.augment:
+            return transforms.Compose([
+                transforms.Resize(self.img_size + 32),
+                transforms.RandomCrop(self.img_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]
+                )
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize(self.img_size),
+                transforms.CenterCrop(self.img_size),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]
+                )
+            ])
+            
+    def _load_image(self, image_path: str) -> Image.Image:
+        """Load and return PIL Image."""
+        full_path = self.data_path / image_path
+        if full_path.exists():
+            return Image.open(full_path).convert('RGB')
+        else:
+            # Return dummy image for demonstration
+            return Image.new('RGB', (self.img_size, self.img_size), color='gray')
+            
+    def _tokenize_text(self, text: str) -> Dict[str, torch.Tensor]:
+        """Tokenize text input."""
+        if self.tokenizer is not None:
+            # Use provided tokenizer (e.g., from transformers)
+            encoding = self.tokenizer(
+                text,
+                max_length=self.max_text_length,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt'
+            )
+            return {
+                'input_ids': encoding['input_ids'].squeeze(0),
+                'attention_mask': encoding['attention_mask'].squeeze(0)
+            }
+        else:
+            # Simple character-based encoding
+            input_ids = [1] + [min(ord(c) % 30000, 30521) for c in text[:self.max_text_length - 2]] + [2]
+            attention_mask = [1] * len(input_ids)
+            
+            # Pad to max length
+            while len(input_ids) < self.max_text_length:
+                input_ids.append(0)
+                attention_mask.append(0)
+                
+            return {
+                'input_ids': torch.tensor(input_ids, dtype=torch.long),
+                'attention_mask': torch.tensor(attention_mask, dtype=torch.long)
+            }
+            
+    def __len__(self) -> int:
+        return len(self.samples)
+        
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        """Get a single sample."""
+        sample = self.samples[idx]
+        
+        # Load and transform image
+        image = self._load_image(sample['image_path'])
+        image = self.transform(image)
+        
+        # Tokenize text
+        text_encoding = self._tokenize_text(sample['caption'])
+        
+        # Prepare output
+        output = {
+            'images': image,
+            'input_ids': text_encoding['input_ids'],
+            'attention_mask': text_encoding['attention_mask'],
+            'labels': torch.tensor(sample.get('label', 0), dtype=torch.long)
+        }
+        
+        return output
+
+
+class COCOCaptionsDataset(MultiModalDataset):
+    """Dataset for COCO Captions."""
+    
+    def _load_annotations(self) -> List[Dict]:
+        """Load COCO annotations."""
+        from pycocotools.coco import COCO
+        
+        try:
+            annotation_file = self.data_path / 'annotations' / f'captions_{self.split}2017.json'
+            coco = COCO(annotation_file)
+            
+            samples = []
+            img_ids = coco.getImgIds()
+            
+            for img_id in img_ids:
+                img_info = coco.loadImgs(img_id)[0]
+                ann_ids = coco.getAnnIds(imgIds=img_id)
+                anns = coco.loadAnns(ann_ids)
+                
+                for ann in anns:
+                    samples.append({
+                        'image_path': f"{self.split}2017/{img_info['file_name']}",
+                        'caption': ann['caption'],
+                        'label': 0  # COCO doesn't have labels for captioning
+                    })
+                    
+            return samples
+        except:
+            # Fallback to parent implementation
+            return super()._load_annotations()
+
+
+class ImageNetDataset(Dataset):
+    """Simple ImageNet-style dataset."""
+    
+    def __init__(
+        self,
+        data_path: str,
+        split: str = 'train',
+        img_size: int = 224,
+        augment: bool = True
+    ):
+        super().__init__()
+        self.data_path = Path(data_path) / split
+        self.img_size = img_size
+        self.augment = augment and (split == 'train')
+        
+        # Load image paths and labels
+        self.samples = self._load_samples()
+        self.transform = self._get_transforms()
+        
+    def _load_samples(self) -> List[Tuple[str, int]]:
+        """Load image paths and labels."""
+        samples = []
+        
+        # Assume directory structure: data_path/class_name/image.jpg
+        if self.data_path.exists():
+            class_dirs = sorted([d for d in self.data_path.iterdir() if d.is_dir()])
+            
+            for label, class_dir in enumerate(class_dirs):
+                for img_path in class_dir.glob('*.jpg'):
+                    samples.append((str(img_path), label))
+                    
+        return samples if samples else [('dummy.jpg', 0)]
+        
+    def _get_transforms(self):
+        """Get image transformations."""
+        if self.augment:
+            return transforms.Compose([
+                transforms.RandomResizedCrop(self.img_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(0.3, 0.3, 0.3),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+        else:
+            return transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(self.img_size),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            
+    def __len__(self) -> int:
+        return len(self.samples)
+        
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        """Get a single sample."""
+        img_path, label = self.samples[idx]
+        
+        try:
+            image = Image.open(img_path).convert('RGB')
+        except:
+            image = Image.new('RGB', (self.img_size, self.img_size))
+            
+        image = self.transform(image)
+        
+        return {
+            'images': image,
+            'labels': torch.tensor(label, dtype=torch.long),
+            'input_ids': torch.zeros(512, dtype=torch.long),  # Dummy for vision-only
+            'attention_mask': torch.zeros(512, dtype=torch.long)
+        }
+
+
+def create_dataloader(
+    dataset: Dataset,
+    batch_size: int = 32,
+    num_workers: int = 4,
+    shuffle: bool = True,
+    pin_memory: bool = True,
+    drop_last: bool = True
+) -> DataLoader:
+    """Create a DataLoader with specified parameters."""
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        drop_last=drop_last,
+        persistent_workers=num_workers > 0
+    )
+
+
+def create_dataset_from_config(config: Dict) -> Tuple[Dataset, Dataset]:
+    """
+    Create train and validation datasets from config.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        (train_dataset, val_dataset)
+    """
+    data_config = config.get('data', {})
+    dataset_name = data_config.get('train_dataset', 'coco_captions')
+    
+    # Get tokenizer if needed
+    tokenizer = None
+    try:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+    except:
+        pass
+    
+    if dataset_name == 'coco_captions':
+        train_dataset = COCOCaptionsDataset(
+            data_path=data_config.get('data_path', './data/coco'),
+            split='train',
+            img_size=config.get('model', {}).get('vision_encoder', {}).get('img_size', 224),
+            tokenizer=tokenizer,
+            augment=True
+        )
+        val_dataset = COCOCaptionsDataset(
+            data_path=data_config.get('data_path', './data/coco'),
+            split='val',
+            img_size=config.get('model', {}).get('vision_encoder', {}).get('img_size', 224),
+            tokenizer=tokenizer,
+            augment=False
+        )
+    elif dataset_name == 'imagenet':
+        train_dataset = ImageNetDataset(
+            data_path=data_config.get('data_path', './data/imagenet'),
+            split='train',
+            img_size=config.get('model', {}).get('vision_encoder', {}).get('img_size', 224),
+            augment=True
+        )
+        val_dataset = ImageNetDataset(
+            data_path=data_config.get('data_path', './data/imagenet'),
+            split='val',
+            img_size=config.get('model', {}).get('vision_encoder', {}).get('img_size', 224),
+            augment=False
+        )
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
+        
+    return train_dataset, val_dataset
