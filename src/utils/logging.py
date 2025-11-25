@@ -24,8 +24,18 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Remove existing handlers
-    logger.handlers = []
+    # Remove existing handlers (close them first to avoid ResourceWarnings)
+    if logger.handlers:
+        for h in list(logger.handlers):
+            try:
+                h.flush()
+            except (OSError, ValueError):
+                pass
+            try:
+                h.close()
+            except (OSError, ValueError):
+                pass
+        logger.handlers = []
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -65,7 +75,7 @@ class MetricsLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize metrics file
-        with open(self.metrics_file, "w") as f:
+        with open(self.metrics_file, "w", encoding="utf-8") as f:
             f.write(f"Experiment: {experiment_name}\n")
             f.write(f"Started: {datetime.now()}\n")
             f.write("-" * 80 + "\n")
@@ -79,7 +89,7 @@ class MetricsLogger:
             metrics: Dictionary of metric names and values
             prefix: Optional prefix for metric names
         """
-        with open(self.metrics_file, "a") as f:
+        with open(self.metrics_file, "a", encoding="utf-8") as f:
             f.write(f"\nStep {step}:\n")
             for key, value in metrics.items():
                 metric_name = f"{prefix}{key}" if prefix else key
@@ -90,7 +100,7 @@ class MetricsLogger:
 
     def log_epoch(self, epoch: int, train_metrics: Dict[str, Any], val_metrics: Optional[Dict[str, Any]] = None) -> None:
         """Log epoch summary."""
-        with open(self.metrics_file, "a") as f:
+        with open(self.metrics_file, "a", encoding="utf-8") as f:
             f.write(f"\n{'='*80}\n")
             f.write(f"Epoch {epoch} Summary:\n")
             f.write(f"{'='*80}\n")
@@ -124,7 +134,7 @@ class WandbLogger:
             except ImportError:
                 print("wandb not installed, disabling wandb logging")
                 self.enabled = False
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 print(f"Failed to initialize wandb: {e}")
                 self.enabled = False
 
