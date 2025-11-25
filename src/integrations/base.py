@@ -1,7 +1,7 @@
 """Base classes and utilities for API integrations."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable, cast
 import logging
 import time
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ class APIResponse:
     metadata: Optional[Dict[str, Any]] = None
     timestamp: Optional[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = time.time()
 
@@ -38,7 +38,7 @@ class APIIntegration(ABC):
         self.cache_dir = config.get('cache_dir', './cache')
 
     @abstractmethod
-    def query(self, prompt: str, **kwargs) -> APIResponse:
+    def query(self, prompt: str, **kwargs: Any) -> APIResponse:
         """Execute a query against the API.
 
         Args:
@@ -62,7 +62,7 @@ class APIIntegration(ABC):
         """
         raise NotImplementedError
 
-    def _make_request_with_retry(self, request_func, *args, **kwargs) -> APIResponse:
+    def _make_request_with_retry(self, request_func: Callable[..., APIResponse], *args: Any, **kwargs: Any) -> APIResponse:
         """Make a request with automatic retry logic.
 
         Args:
@@ -101,7 +101,7 @@ class KnowledgeInjector:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.injection_weight = config.get('injection_weight', 0.1)
-        self.validation_threshold = config.get('validation_threshold', 0.8)
+        self.validation_threshold = cast(float, config.get('validation_threshold', 0.8))
 
     @abstractmethod
     def inject_knowledge(self, input_data: Any, model_output: Any) -> Dict[str, Any]:

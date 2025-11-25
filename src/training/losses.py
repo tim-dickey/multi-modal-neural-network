@@ -1,6 +1,6 @@
 """Loss functions for multi-modal training."""
 
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 import torch
 import torch.nn as nn
@@ -22,7 +22,7 @@ class CrossEntropyLoss(nn.Module):
         Returns:
             loss: scalar
         """
-        return self.loss_fn(logits, labels)
+        return cast(torch.Tensor, self.loss_fn(logits, labels))
 
 
 class ContrastiveLoss(nn.Module):
@@ -136,7 +136,7 @@ class MultiTaskLoss(nn.Module):
 class MetaLoss(nn.Module):
     """Meta-loss for double-loop learning."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def forward(
@@ -160,7 +160,7 @@ class MetaLoss(nn.Module):
         # Meta-loss encourages the controller to predict future loss trends
         combined_loss = task_loss + 0.1 * meta_loss
 
-        return combined_loss
+        return cast(torch.Tensor, combined_loss)
 
 
 def create_loss_function(config: Dict) -> nn.Module:
@@ -190,7 +190,7 @@ def create_loss_function(config: Dict) -> nn.Module:
         )
     elif loss_type == "multitask":
         # Define task-specific losses
-        task_losses = {}
+        task_losses: Dict[str, nn.Module] = {}
         for task_name, task_config in config.get("tasks", {}).items():
             task_loss_type = task_config.get("loss_type", "cross_entropy")
             if task_loss_type == "cross_entropy":

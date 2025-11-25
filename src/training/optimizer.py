@@ -1,6 +1,6 @@
 """Optimizer and learning rate scheduler configuration."""
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import torch
 from torch.optim import SGD, Adam, AdamW
@@ -9,13 +9,14 @@ from torch.optim.lr_scheduler import (
     LinearLR,
     ReduceLROnPlateau,
     SequentialLR,
+    LambdaLR,
 )
 
 
 def get_parameter_groups(
     model: torch.nn.Module,
     weight_decay: float = 0.01,
-    no_decay_keywords: List[str] = None,
+    no_decay_keywords: Optional[List[str]] = None,
 ) -> List[Dict]:
     """
     Separate parameters into groups with and without weight decay.
@@ -71,6 +72,8 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
     # Get parameter groups with proper weight decay
     param_groups = get_parameter_groups(model, weight_decay)
 
+    optimizer: torch.optim.Optimizer
+
     if optimizer_name == "adamw":
         optimizer = AdamW(param_groups, lr=lr, betas=(0.9, 0.999), eps=1e-8)
     elif optimizer_name == "adam":
@@ -85,7 +88,7 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
 
 def create_scheduler(
     optimizer: torch.optim.Optimizer, config: Dict, steps_per_epoch: int
-) -> Tuple[torch.optim.lr_scheduler._LRScheduler, str]:
+) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
     """
     Create learning rate scheduler from config.
 
@@ -102,6 +105,8 @@ def create_scheduler(
     warmup_steps = training_config.get("warmup_steps", 1000)
     max_epochs = training_config.get("max_epochs", 50)
     total_steps = steps_per_epoch * max_epochs
+
+    scheduler: torch.optim.lr_scheduler.LRScheduler
 
     if scheduler_name == "cosine":
         # Cosine annealing with linear warmup
@@ -125,11 +130,11 @@ def create_scheduler(
 
     elif scheduler_name == "linear":
         # Linear warmup then linear decay
-        def lr_lambda(step):
+        def lr_lambda(step: int) -> float:
             if step < warmup_steps:
-                return step / warmup_steps
+                return float(step / warmup_steps)
             else:
-                return max(0.0, (total_steps - step) / (total_steps - warmup_steps))
+                return max(0.0, float((total_steps - step) / (total_steps - warmup_steps)))
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
         return scheduler, "step"
@@ -141,16 +146,15 @@ def create_scheduler(
             mode="min",
             factor=0.5,
             patience=5,
-            verbose=True,
             min_lr=training_config.get("min_lr", 1e-6),
         )
         return scheduler, "epoch"
 
     elif scheduler_name == "constant":
         # Constant learning rate with warmup
-        def lr_lambda(step):
+        def lr_lambda(step: int) -> float:
             if step < warmup_steps:
-                return step / warmup_steps
+                return float(step / warmup_steps)
             else:
                 return 1.0
 
@@ -168,7 +172,7 @@ class GradientClipper:
         self.max_norm = max_norm
         self.norm_type = norm_type
 
-    def __call__(self, parameters) -> float:
+    def __call__(self, parameters: Any) -> float:
         """
         Clip gradients and return the gradient norm.
 
@@ -189,7 +193,7 @@ class GradientClipper:
         # Compute gradient norm
         total_norm = torch.norm(
             torch.stack(
-                [torch.norm(p.grad.detach(), self.norm_type) for p in parameters]
+                [torch.norm(cast(torch.Tensor, p.grad).detach(), self.norm_type) for p in parameters]
             ),
             self.norm_type,
         )
@@ -197,7 +201,7 @@ class GradientClipper:
         # Clip gradients
         torch.nn.utils.clip_grad_norm_(parameters, self.max_norm, self.norm_type)
 
-        return total_norm.item()
+        return float(total_norm.item())
 
 
 class AdaptiveLRController:
@@ -210,7 +214,7 @@ class AdaptiveLRController:
         self.min_scale = min_scale
         self.max_scale = max_scale
 
-    def update_lr(self, optimizer: torch.optim.Optimizer, lr_scale: torch.Tensor):
+    def update_lr(self, optimizer: torch.optim.Optimizer, lr_scale: torch.Tensor) -> None:
         """
         Update optimizer learning rate based on meta-controller signal.
 
@@ -227,4 +231,4 @@ class AdaptiveLRController:
 
     def get_current_lr(self, optimizer: torch.optim.Optimizer) -> float:
         """Get current learning rate."""
-        return optimizer.param_groups[0]["lr"]
+        return float(optimizer.param_groups[0]["lr"])

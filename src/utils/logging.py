@@ -70,7 +70,7 @@ class MetricsLogger:
             f.write(f"Started: {datetime.now()}\n")
             f.write("-" * 80 + "\n")
 
-    def log_metrics(self, step: int, metrics: Dict[str, float], prefix: str = ""):
+    def log_metrics(self, step: int, metrics: Dict[str, Any], prefix: str = "") -> None:
         """
         Log metrics to file.
 
@@ -88,7 +88,7 @@ class MetricsLogger:
                 else:
                     f.write(f"  {metric_name}: {value}\n")
 
-    def log_epoch(self, epoch: int, train_metrics: Dict, val_metrics: Dict = None):
+    def log_epoch(self, epoch: int, train_metrics: Dict[str, Any], val_metrics: Optional[Dict[str, Any]] = None) -> None:
         """Log epoch summary."""
         with open(self.metrics_file, "a") as f:
             f.write(f"\n{'='*80}\n")
@@ -111,8 +111,8 @@ class WandbLogger:
     """Wrapper for Weights & Biases logging."""
 
     def __init__(
-        self, project: str, experiment: str, config: Dict, enabled: bool = True
-    ):
+        self, project: str, experiment: str, config: Dict[str, Any], enabled: bool = True
+    ) -> None:
         self.enabled = enabled
 
         if self.enabled:
@@ -128,23 +128,23 @@ class WandbLogger:
                 print(f"Failed to initialize wandb: {e}")
                 self.enabled = False
 
-    def log(self, metrics: Dict[str, Any], step: Optional[int] = None):
+    def log(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
         """Log metrics to wandb."""
         if self.enabled:
             self.wandb.log(metrics, step=step)
 
-    def log_image(self, key: str, image: Any, step: Optional[int] = None):
+    def log_image(self, key: str, image: Any, step: Optional[int] = None) -> None:
         """Log image to wandb."""
         if self.enabled:
             self.wandb.log({key: self.wandb.Image(image)}, step=step)
 
-    def finish(self):
+    def finish(self) -> None:
         """Finish wandb run."""
         if self.enabled:
             self.wandb.finish()
 
 
-def log_model_info(logger: logging.Logger, model: Any):
+def log_model_info(logger: logging.Logger, model: Any) -> None:
     """Log model architecture information."""
     logger.info("=" * 80)
     logger.info("Model Information:")

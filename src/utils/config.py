@@ -3,12 +3,12 @@
 import copy
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Union, cast
 
 import yaml
 
 
-def load_config(config_path: str) -> Dict[str, Any]:
+def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
     """
     Load configuration from YAML file.
 
@@ -24,15 +24,15 @@ def load_config(config_path: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+        config = cast(Dict[str, Any], yaml.safe_load(f))
 
     # Resolve environment variables
-    config = _resolve_env_vars(config)
+    config = cast(Dict[str, Any], _resolve_env_vars(config))
 
     return config
 
 
-def _resolve_env_vars(config: Dict) -> Dict:
+def _resolve_env_vars(config: Any) -> Any:
     """Recursively resolve environment variables in config."""
     if isinstance(config, dict):
         return {k: _resolve_env_vars(v) for k, v in config.items()}
@@ -48,7 +48,7 @@ def _resolve_env_vars(config: Dict) -> Dict:
         return config
 
 
-def save_config(config: Dict[str, Any], save_path: str):
+def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
     """
     Save configuration to YAML file.
 
@@ -63,7 +63,7 @@ def save_config(config: Dict[str, Any], save_path: str):
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 
-def merge_configs(base_config: Dict, override_config: Dict) -> Dict:
+def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Merge two configurations, with override_config taking precedence.
 
@@ -85,7 +85,7 @@ def merge_configs(base_config: Dict, override_config: Dict) -> Dict:
     return result
 
 
-def validate_config(config: Dict) -> bool:
+def validate_config(config: Dict[str, Any]) -> bool:
     """
     Validate configuration has required fields.
 
@@ -121,14 +121,14 @@ def validate_config(config: Dict) -> bool:
 class ConfigNamespace:
     """Convert dictionary config to namespace for easier access."""
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict[str, Any]) -> None:
         for key, value in config.items():
             if isinstance(value, dict):
                 setattr(self, key, ConfigNamespace(value))
             else:
                 setattr(self, key, value)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert namespace back to dictionary."""
         result = {}
         for key, value in self.__dict__.items():
@@ -138,5 +138,5 @@ class ConfigNamespace:
                 result[key] = value
         return result
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.to_dict())

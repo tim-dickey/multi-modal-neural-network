@@ -56,7 +56,7 @@ class Trainer:
             project_name = self.config.get("logging", {}).get(
                 "project", "multi-modal-net"
             )
-            self.wandb_logger = WandbLogger(
+            self.wandb_logger: Optional[WandbLogger] = WandbLogger(
                 project=project_name,
                 experiment=experiment_name,
                 config=self.config,
@@ -92,8 +92,8 @@ class Trainer:
             pin_memory=data_config.get("pin_memory", True),
         )
 
-        self.logger.info(f"Train samples: {len(train_dataset)}")
-        self.logger.info(f"Val samples: {len(val_dataset)}")
+        self.logger.info(f"Train samples: {len(train_dataset)}")  # type: ignore
+        self.logger.info(f"Val samples: {len(val_dataset)}")  # type: ignore
 
         # Create loss function
         self.criterion = create_loss_function(self.config)
@@ -137,7 +137,7 @@ class Trainer:
         output_dir.mkdir(parents=True, exist_ok=True)
         save_config(self.config, str(output_dir / "config.yaml"))
 
-    def train(self):
+    def train(self) -> None:
         """Main training loop."""
         max_epochs = self.config.get("training", {}).get("max_epochs", 50)
 
@@ -320,6 +320,9 @@ class Trainer:
             logits = outputs["logits"]
             labels = batch.get("labels")
 
+            if labels is None:
+                continue
+
             # Compute loss
             loss = self.criterion(logits, labels)
 
@@ -345,7 +348,7 @@ class Trainer:
 
         return metrics
 
-    def save_checkpoint(self, is_best: bool = False):
+    def save_checkpoint(self, is_best: bool = False) -> None:
         """Save model checkpoint."""
         checkpoint_dir = Path(
             self.config.get("paths", {}).get("checkpoint_dir", "./checkpoints")
@@ -373,7 +376,7 @@ class Trainer:
 
         self.logger.info(f"Checkpoint saved to {checkpoint_path}")
 
-    def load_checkpoint(self, checkpoint_path: str):
+    def load_checkpoint(self, checkpoint_path: str) -> None:
         """Load model from checkpoint."""
         self.logger.info(f"Loading checkpoint from {checkpoint_path}")
 

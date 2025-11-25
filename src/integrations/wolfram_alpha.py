@@ -1,7 +1,7 @@
 """Wolfram Alpha API integration for symbolic computation and knowledge injection."""
 
 import wolframalpha
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from .base import APIIntegration, APIResponse, KnowledgeInjector
 
@@ -20,7 +20,7 @@ class WolframAlphaIntegration(APIIntegration):
         # Query tracking (in production, this would be persistent)
         self.daily_queries = 0
 
-    def query(self, prompt: str, **kwargs) -> APIResponse:
+    def query(self, prompt: str, **kwargs: Any) -> APIResponse:
         """Query Wolfram Alpha with the given prompt.
 
         Args:
@@ -139,12 +139,12 @@ class WolframAlphaIntegration(APIIntegration):
         for pod in response.data:
             if pod["title"].lower() in ["result", "solution", "answer"]:
                 if pod["subpods"] and pod["subpods"][0]["plaintext"]:
-                    return pod["subpods"][0]["plaintext"]
+                    return cast(str, pod["subpods"][0]["plaintext"])
 
         # Fallback to first pod with plaintext
         for pod in response.data:
             if pod["subpods"] and pod["subpods"][0]["plaintext"]:
-                return pod["subpods"][0]["plaintext"]
+                return cast(str, pod["subpods"][0]["plaintext"])
 
         return None
 

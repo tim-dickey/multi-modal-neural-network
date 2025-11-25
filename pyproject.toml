@@ -161,5 +161,6 @@ module = [
     "tqdm.*",
     "yaml.*",
     "numpy.*",
+    "wolframalpha.*",
 ]
 ignore_missing_imports = true

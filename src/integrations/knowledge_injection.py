@@ -1,6 +1,6 @@
 """Knowledge injection utilities for integrating external knowledge into model training."""
 
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, cast
 import torch
 import torch.nn as nn
 from .base import KnowledgeInjector
@@ -109,7 +109,7 @@ class KnowledgeInjectionManager:
             weight=config.get('default_injection_weight', 0.1)
         )
 
-    def register_injector(self, name: str, injector: KnowledgeInjector):
+    def register_injector(self, name: str, injector: KnowledgeInjector) -> None:
         """Register a knowledge injector.
 
         Args:
@@ -118,7 +118,7 @@ class KnowledgeInjectionManager:
         """
         self.injectors[name] = injector
 
-    def register_strategy(self, name: str, strategy: InjectionStrategy):
+    def register_strategy(self, name: str, strategy: InjectionStrategy) -> None:
         """Register an injection strategy.
 
         Args:
@@ -204,7 +204,7 @@ class KnowledgeInjectionManager:
         return list(self.strategies.keys())
 
 
-def create_injection_strategy(strategy_name: str, **kwargs) -> InjectionStrategy:
+def create_injection_strategy(strategy_name: str, **kwargs: Any) -> InjectionStrategy:
     """Factory function to create injection strategies.
 
     Args:
@@ -222,7 +222,7 @@ def create_injection_strategy(strategy_name: str, **kwargs) -> InjectionStrategy
 
     strategy_class = strategies.get(strategy_name.lower())
     if strategy_class:
-        return strategy_class(**kwargs)
+        return cast(InjectionStrategy, strategy_class(**kwargs))
 
     # Default to additive
-    return AdditiveInjection(**kwargs)
+    return cast(InjectionStrategy, AdditiveInjection(**kwargs))

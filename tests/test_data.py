@@ -99,10 +99,10 @@ class TestMultiModalDataset:
 
         # Create dataset
         dataset = MultiModalDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=True,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         assert len(dataset) == 5
@@ -140,10 +140,10 @@ class TestMultiModalDataset:
             json.dump(annotations, f)
 
         dataset = MultiModalDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=False,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         # Get first item
@@ -157,7 +157,7 @@ class TestMultiModalDataset:
         assert item["image"].shape == (3, 224, 224)
         assert item["input_ids"].ndim == 1
         assert item["attention_mask"].ndim == 1
-        assert isinstance(item["label"], int)
+        assert isinstance(item["label"], torch.Tensor)
 
     def test_dataset_collate_fn(self, temp_data_dir, model_config):
         """Test batch collation."""
@@ -192,10 +192,10 @@ class TestMultiModalDataset:
             json.dump(annotations, f)
 
         dataset = MultiModalDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=False,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         # Get batch
@@ -248,10 +248,10 @@ class TestCOCOCaptionsDataset:
 
         # Create dataset
         dataset = COCOCaptionsDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=False,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         assert len(dataset) > 0
@@ -266,9 +266,13 @@ class TestImageNetDataset:
         import numpy as np
         from PIL import Image
 
+        # Create train directory
+        train_dir = temp_data_dir / "train"
+        train_dir.mkdir()
+
         # Create class directories
         for class_id in range(3):
-            class_dir = temp_data_dir / f"n{class_id:08d}"
+            class_dir = train_dir / f"n{class_id:08d}"
             class_dir.mkdir()
 
             # Create dummy images
@@ -281,7 +285,7 @@ class TestImageNetDataset:
 
         # Create dataset
         dataset = ImageNetDataset(
-            root_dir=str(temp_data_dir), config=model_config, is_train=True
+            data_path=str(temp_data_dir), split="train", img_size=224
         )
 
         assert len(dataset) == 6  # 3 classes * 2 images
@@ -291,9 +295,13 @@ class TestImageNetDataset:
         import numpy as np
         from PIL import Image
 
+        # Create train directory
+        train_dir = temp_data_dir / "train"
+        train_dir.mkdir()
+
         # Create class directories
         for class_id in range(2):
-            class_dir = temp_data_dir / f"n{class_id:08d}"
+            class_dir = train_dir / f"n{class_id:08d}"
             class_dir.mkdir()
 
             img = Image.fromarray(
@@ -303,7 +311,7 @@ class TestImageNetDataset:
             img.save(img_path)
 
         dataset = ImageNetDataset(
-            root_dir=str(temp_data_dir), config=model_config, is_train=False
+            data_path=str(temp_data_dir), split="train", img_size=224
         )
 
         item = dataset[0]
@@ -372,14 +380,24 @@ class TestDataLoaders:
         with open(val_file, "w") as f:
             json.dump(val_annotations, f)
 
-        # Update config
-        model_config["data"]["train_annotations"] = str(train_file)
-        model_config["data"]["val_annotations"] = str(val_file)
-        model_config["data"]["images_dir"] = str(images_dir)
-        model_config["data"]["batch_size"] = 2
+        # Create datasets
+        train_dataset = MultiModalDataset(
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
+        )
+        val_dataset = MultiModalDataset(
+            data_path=str(temp_data_dir),
+            split="train",  # Using train split for both since we created train.json
+            img_size=224,
+            max_text_length=512,
+        )
 
         # Create data loaders
-        train_loader, val_loader = create_data_loaders(model_config)
+        train_loader, val_loader = create_data_loaders(
+            train_dataset, val_dataset, batch_size=2, num_workers=0, pin_memory=False
+        )
 
         assert train_loader is not None
         assert val_loader is not None
@@ -419,16 +437,16 @@ class TestDataLoaders:
             json.dump(annotations, f)
 
         dataset = MultiModalDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=False,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         from torch.utils.data import DataLoader
 
         data_loader = DataLoader(
-            dataset, batch_size=2, shuffle=False, collate_fn=dataset.collate_fn
+            dataset, batch_size=2, shuffle=False
         )
 
         # Iterate through one batch
@@ -479,10 +497,10 @@ class TestDataPipelinePerformance:
             json.dump(annotations, f)
 
         dataset = MultiModalDataset(
-            annotations_file=str(annotations_file),
-            images_dir=str(images_dir),
-            config=model_config,
-            is_train=False,
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=224,
+            max_text_length=512,
         )
 
         from torch.utils.data import DataLoader
@@ -492,7 +510,6 @@ class TestDataPipelinePerformance:
             batch_size=4,
             shuffle=False,
             num_workers=0,  # Single worker for testing
-            collate_fn=dataset.collate_fn,
         )
 
         # Time loading

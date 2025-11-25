@@ -145,7 +145,7 @@ class KnowledgeInjectionValidator:
         self.config = config or {}
         self.content_validator = ContentValidator(self.config)
 
-    def validate_injection(self, injection_data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_injection(self, injection_data: Any) -> Dict[str, Any]:
         """Validate knowledge injection data.
 
         Args:

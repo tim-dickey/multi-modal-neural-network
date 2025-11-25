@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import torch
 from PIL import Image
@@ -19,7 +19,7 @@ class MultiModalDataset(Dataset):
         split: str = "train",
         img_size: int = 224,
         max_text_length: int = 512,
-        tokenizer=None,
+        tokenizer: Optional[Any] = None,
         augment: bool = True,
     ):
         super().__init__()
@@ -36,27 +36,31 @@ class MultiModalDataset(Dataset):
         # Image transformations
         self.transform = self._get_transforms()
 
-    def _load_annotations(self) -> List[Dict]:
+    def _load_annotations(self) -> List[Dict[str, Any]]:
         """Load dataset annotations."""
-        # This is a placeholder - implement based on your dataset format
-        # For example, COCO format or custom JSON
-        annotation_file = self.data_path / f"{self.split}.json"
+        # Try different annotation file names
+        possible_files = [
+            self.data_path / "annotations.json",
+            self.data_path / f"{self.split}.json",
+            self.data_path / f"annotations_{self.split}.json",
+        ]
+        
+        for annotation_file in possible_files:
+            if annotation_file.exists():
+                with open(annotation_file, "r") as f:
+                    data = cast(List[Dict[str, Any]], json.load(f))
+                return data
+        
+        # Return dummy data for demonstration
+        return [
+            {
+                "image_path": "image_0.jpg",
+                "caption": "A sample image caption",
+                "label": 0,
+            }
+        ]
 
-        if annotation_file.exists():
-            with open(annotation_file, "r") as f:
-                data = json.load(f)
-            return data
-        else:
-            # Return dummy data for demonstration
-            return [
-                {
-                    "image_path": "image_0.jpg",
-                    "caption": "A sample image caption",
-                    "label": 0,
-                }
-            ]
-
-    def _get_transforms(self):
+    def _get_transforms(self) -> transforms.Compose:
         """Get image transformations."""
         if self.augment:
             return transforms.Compose(
@@ -144,19 +148,34 @@ class MultiModalDataset(Dataset):
 
         # Prepare output
         output = {
-            "images": image,
+            "image": image,
             "input_ids": text_encoding["input_ids"],
             "attention_mask": text_encoding["attention_mask"],
-            "labels": torch.tensor(sample.get("label", 0), dtype=torch.long),
+            "label": torch.tensor(sample.get("label", 0), dtype=torch.long),
         }
 
         return output
+
+    @staticmethod
+    def collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        """Collate batch of samples."""
+        images = torch.stack([item["image"] for item in batch])
+        input_ids = torch.stack([item["input_ids"] for item in batch])
+        attention_masks = torch.stack([item["attention_mask"] for item in batch])
+        labels = torch.stack([item["label"] for item in batch])
+
+        return {
+            "image": images,
+            "input_ids": input_ids,
+            "attention_mask": attention_masks,
+            "label": labels,
+        }
 
 
 class COCOCaptionsDataset(MultiModalDataset):
     """Dataset for COCO Captions."""
 
-    def _load_annotations(self) -> List[Dict]:
+    def _load_annotations(self) -> List[Dict[str, Any]]:
         """Load COCO annotations."""
         from pycocotools.coco import COCO
 
@@ -175,10 +194,11 @@ class COCOCaptionsDataset(MultiModalDataset):
                 anns = coco.loadAnns(ann_ids)
 
                 for ann in anns:
+                    ann_dict = cast(Dict[str, Any], ann)
                     samples.append(
                         {
                             "image_path": f"{self.split}2017/{img_info['file_name']}",
-                            "caption": ann["caption"],
+                            "caption": ann_dict["caption"],
                             "label": 0,  # COCO doesn't have labels for captioning
                         }
                     )
@@ -219,10 +239,12 @@ class ImageNetDataset(Dataset):
             for label, class_dir in enumerate(class_dirs):
                 for img_path in class_dir.glob("*.jpg"):
                     samples.append((str(img_path), label))
+                for img_path in class_dir.glob("*.JPEG"):
+                    samples.append((str(img_path), label))
 
         return samples if samples else [("dummy.jpg", 0)]
 
-    def _get_transforms(self):
+    def _get_transforms(self) -> transforms.Compose:
         """Get image transformations."""
         if self.augment:
             return transforms.Compose(
@@ -263,8 +285,8 @@ class ImageNetDataset(Dataset):
         image = self.transform(image)
 
         return {
-            "images": image,
-            "labels": torch.tensor(label, dtype=torch.long),
+            "image": image,
+            "label": torch.tensor(label, dtype=torch.long),
             "input_ids": torch.zeros(512, dtype=torch.long),  # Dummy for vision-only
             "attention_mask": torch.zeros(512, dtype=torch.long),
         }
@@ -311,6 +333,9 @@ def create_dataset_from_config(config: Dict) -> Tuple[Dataset, Dataset]:
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     except Exception:
         pass
+
+    train_dataset: Dataset
+    val_dataset: Dataset
 
     if dataset_name == "coco_captions":
         train_dataset = COCOCaptionsDataset(

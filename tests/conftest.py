@@ -456,7 +456,7 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session")
-def pytest_session_temp_dir(tmp_path_factory):
+def session_temp_dir(tmp_path_factory):
     """Create a session-wide temporary directory."""
     return tmp_path_factory.mktemp("session_temp")
 
