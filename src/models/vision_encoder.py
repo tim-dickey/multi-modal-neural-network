@@ -226,7 +226,7 @@ class VisionEncoder(nn.Module):
         """Extract attention maps from a specific layer for visualization."""
         # This is a simplified version - for full implementation,
         # you'd need to modify the forward pass to return attention weights
-        pass
+        raise NotImplementedError("Attention map extraction not yet implemented")
 
 
 def create_vision_encoder(config: dict) -> VisionEncoder:

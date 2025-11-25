@@ -197,7 +197,7 @@ class TestGradientAccumulation:
     """Tests for gradient accumulation."""
     
     def test_gradient_accumulation_equivalence(self, model_config):
-        """Test that gradient accumulation gives equivalent results."""
+        """Test that gradient accumulation gives equivalent gradients."""
         from src.models import create_multi_modal_model
         
         # Create two identical models
@@ -207,9 +207,9 @@ class TestGradientAccumulation:
         # Copy weights
         model2.load_state_dict(model1.state_dict())
         
-        # Create optimizers
-        optimizer1 = create_optimizer(model1, model_config)
-        optimizer2 = create_optimizer(model2, model_config)
+        # Set both models to eval mode to disable dropout and other stochastic layers
+        model1.eval()
+        model2.eval()
         
         # Generate sample data
         batch_size = 4
@@ -219,14 +219,14 @@ class TestGradientAccumulation:
         labels = torch.randint(0, 10, (batch_size,))
         
         # Model 1: Single large batch
-        optimizer1.zero_grad()
         outputs1 = model1(images, input_ids, attention_mask)
         loss1 = nn.functional.cross_entropy(outputs1['logits'], labels)
         loss1.backward()
-        optimizer1.step()
+        
+        # Store gradients from model 1
+        grads1 = [p.grad.clone() if p.grad is not None else None for p in model1.parameters()]
         
         # Model 2: Accumulated small batches
-        optimizer2.zero_grad()
         for i in range(2):
             start_idx = i * 2
             end_idx = start_idx + 2
@@ -243,13 +243,12 @@ class TestGradientAccumulation:
             # Scale loss by number of accumulation steps
             (loss2 / 2).backward()
         
-        optimizer2.step()
-        
-        # Check that models have similar parameters (within tolerance)
-        for p1, p2 in zip(model1.parameters(), model2.parameters()):
-            # They won't be exactly equal due to numerical differences
-            # but should be close
-            assert torch.allclose(p1, p2, rtol=1e-3, atol=1e-5)
+        # Check that gradients are equivalent
+        # Since models are in eval mode (no dropout), gradients should be identical
+        for p2, g1 in zip(model2.parameters(), grads1):
+            if g1 is not None and p2.grad is not None:
+                assert torch.allclose(p2.grad, g1, rtol=1e-3, atol=1e-5), \
+                    f"Gradient mismatch: max diff = {(p2.grad - g1).abs().max()}"
 
 
 class TestLearningRateScheduling:

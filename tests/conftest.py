@@ -261,6 +261,22 @@ def dummy_dataset_path():
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+@pytest.fixture
+def temp_output_dir(tmp_path):
+    """Create a temporary output directory for tests."""
+    output_dir = tmp_path / "outputs"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir
+
+
+@pytest.fixture
+def temp_data_dir(tmp_path):
+    """Create a temporary data directory for tests."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    return data_dir
+
+
 @pytest.fixture(autouse=True)
 def cleanup_test_dirs():
     """Cleanup test directories after each test."""

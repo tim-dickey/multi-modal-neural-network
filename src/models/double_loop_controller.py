@@ -2,8 +2,7 @@
 
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional, Tuple
-import copy
+from typing import Dict, Optional, Tuple
 
 
 class LSTMMetaController(nn.Module):
@@ -174,8 +173,8 @@ class DoubleLoopController(nn.Module):
             raise ValueError(f"Unknown controller type: {controller_type}")
             
         # Track statistics for meta-learning
-        self.loss_history = []
-        self.accuracy_history = []
+        self.loss_history: list[float] = []
+        self.accuracy_history: list[float] = []
         
     def should_update_meta(self) -> bool:
         """Check if meta-controller should be updated."""

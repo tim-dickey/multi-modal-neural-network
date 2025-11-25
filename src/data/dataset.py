@@ -323,3 +323,90 @@ def create_dataset_from_config(config: Dict) -> Tuple[Dataset, Dataset]:
         raise ValueError(f"Unknown dataset: {dataset_name}")
         
     return train_dataset, val_dataset
+
+
+def create_data_loaders(
+    train_dataset: Dataset,
+    val_dataset: Dataset,
+    batch_size: int = 32,
+    num_workers: int = 4,
+    pin_memory: bool = True
+) -> Tuple[DataLoader, DataLoader]:
+    """
+    Create train and validation data loaders.
+    
+    Args:
+        train_dataset: Training dataset
+        val_dataset: Validation dataset
+        batch_size: Batch size
+        num_workers: Number of data loading workers
+        pin_memory: Whether to pin memory
+        
+    Returns:
+        (train_loader, val_loader)
+    """
+    train_loader = create_dataloader(
+        train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=True,
+        pin_memory=pin_memory,
+        drop_last=True
+    )
+    
+    val_loader = create_dataloader(
+        val_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=False,
+        pin_memory=pin_memory,
+        drop_last=False
+    )
+    
+    return train_loader, val_loader
+
+
+def get_transforms(config: Dict, is_train: bool = True) -> transforms.Compose:
+    """
+    Get image transforms based on configuration.
+    
+    Args:
+        config: Configuration dictionary
+        is_train: Whether this is for training (includes augmentation)
+        
+    Returns:
+        Composed transforms
+    """
+    img_size = config.get('data', {}).get('image_size', 224)
+    aug_config = config.get('data', {}).get('augmentation', {})
+    
+    if is_train:
+        transform_list = []
+        
+        if aug_config.get('random_crop', True):
+            transform_list.append(transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)))
+        else:
+            transform_list.append(transforms.Resize(img_size))
+            transform_list.append(transforms.CenterCrop(img_size))
+            
+        if aug_config.get('random_flip', True):
+            transform_list.append(transforms.RandomHorizontalFlip())
+            
+        if aug_config.get('color_jitter', True):
+            transform_list.append(transforms.ColorJitter(
+                brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+            ))
+            
+        transform_list.extend([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    else:
+        transform_list = [
+            transforms.Resize(img_size),
+            transforms.CenterCrop(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]
+    
+    return transforms.Compose(transform_list)

@@ -205,7 +205,8 @@ class SequenceGenerationHead(nn.Module):
             # Inference mode - generate one token at a time
             raise NotImplementedError("Auto-regressive generation not implemented yet")
             
-        batch_size, target_len = target_ids.shape
+        # Get target sequence length for position embeddings
+        target_len = target_ids.shape[1]
         
         # Embed target tokens
         position_ids = self.position_ids[:, :target_len]
@@ -237,15 +238,16 @@ class MultiTaskHead(nn.Module):
     def __init__(
         self,
         hidden_dim: int = 512,
-        tasks: Dict[str, Dict] = None,
+        tasks: Optional[Dict[str, Dict]] = None,
         dropout: float = 0.1
     ):
         super().__init__()
-        self.task_names = list(tasks.keys()) if tasks else []
-        self.heads = nn.ModuleDict()
         
         if tasks is None:
             tasks = {'classification': {'num_classes': 1000}}
+        
+        self.task_names = list(tasks.keys())
+        self.heads = nn.ModuleDict()
             
         for task_name, task_config in tasks.items():
             task_type = task_config.get('type', 'classification')

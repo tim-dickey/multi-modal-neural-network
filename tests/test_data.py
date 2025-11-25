@@ -31,8 +31,11 @@ class TestDataTransforms:
         transforms = get_transforms(config, is_train=True)
         assert transforms is not None
         
-        # Test on sample image
-        image = torch.randint(0, 255, (3, 256, 256), dtype=torch.uint8)
+        # Test on sample PIL image
+        from PIL import Image
+        import numpy as np
+        image_array = np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8)
+        image = Image.fromarray(image_array)
         transformed = transforms(image)
         
         assert transformed.shape == (3, 224, 224)
@@ -50,8 +53,11 @@ class TestDataTransforms:
         transforms = get_transforms(config, is_train=False)
         assert transforms is not None
         
-        # Test on sample image
-        image = torch.randint(0, 255, (3, 256, 256), dtype=torch.uint8)
+        # Test on sample PIL image
+        from PIL import Image
+        import numpy as np
+        image_array = np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8)
+        image = Image.fromarray(image_array)
         transformed = transforms(image)
         
         assert transformed.shape == (3, 224, 224)

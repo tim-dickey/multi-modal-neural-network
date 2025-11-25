@@ -186,12 +186,10 @@ class EarlyFusionLayer(nn.Module):
         # Concatenate vision and text features
         fused_features = torch.cat([vision_features, text_features], dim=1)
         
-        # Create combined mask
-        if text_mask is not None:
-            vision_mask = torch.ones(B, N_vis, device=vision_features.device, dtype=text_mask.dtype)
-            combined_mask = torch.cat([vision_mask, text_mask], dim=1)
-        else:
-            combined_mask = None
+        # Create combined mask (currently unused but may be needed for attention masking)
+        # if text_mask is not None:
+        #     vision_mask = torch.ones(B, N_vis, device=vision_features.device, dtype=text_mask.dtype)
+        #     combined_mask = torch.cat([vision_mask, text_mask], dim=1)
         
         # Process through fusion blocks with alternating modality attention
         for i, block in enumerate(self.blocks):
