@@ -49,10 +49,50 @@ class Trainer:
 
         validate_config(self.config)
 
-        # Setup device
+        # Setup device with GPU/NPU detection
+        from ..utils.gpu_utils import configure_device_for_training, detect_gpu_info
+        from ..utils.npu_utils import detect_npu_info, get_best_available_device
+        
         if device is None:
-            device = self.config.get("hardware", {}).get("device", "cuda")
-        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+            device_config = self.config.get("hardware", {}).get("device", "auto")
+            gpu_id = self.config.get("hardware", {}).get("gpu_id")
+            prefer_npu = self.config.get("hardware", {}).get("prefer_npu", False)
+            
+            # Handle "auto" device selection
+            if device_config == "auto":
+                device_config = get_best_available_device(prefer_npu=prefer_npu)
+                
+                # Log what was detected
+                if device_config == 'cuda':
+                    gpu_info = detect_gpu_info()
+                    if gpu_info['available']:
+                        self.logger.info(f"Using CUDA GPU: {gpu_info['devices'][0]['name']}")
+                elif device_config in ['openvino', 'ryzenai', 'mps', 'privateuseone']:
+                    npu_info = detect_npu_info()
+                    self.logger.info(f"Using NPU: {npu_info['device_name']}")
+                else:
+                    self.logger.warning("No GPU or NPU detected. Training will use CPU. "
+                                      "For GPU support, install PyTorch with CUDA. "
+                                      "For NPU support, install appropriate SDK (OpenVINO, DirectML, etc.)")
+            
+            # Handle NPU device strings
+            if device_config in ['npu', 'openvino', 'ryzenai', 'privateuseone']:
+                # NPU detected - use CPU for now as PyTorch NPU support is limited
+                # Users can implement custom NPU inference in evaluate mode
+                self.logger.info(f"NPU detected ({device_config}), using CPU for training. "
+                               "NPU can be used for optimized inference via ONNX export.")
+                self.device = torch.device('cpu')
+            elif device_config == 'mps':
+                # Apple Silicon
+                self.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+            else:
+                self.device = configure_device_for_training(
+                    device=device_config, 
+                    gpu_id=gpu_id,
+                    verbose=False  # We'll log it ourselves below
+                )
+        else:
+            self.device = torch.device(device if torch.cuda.is_available() else "cpu")
 
         # Resolve important paths with sensible fallbacks
         # Prefer explicit top-level `output_dir` override if present

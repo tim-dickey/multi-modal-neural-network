@@ -15,14 +15,25 @@ This repository contains an open-source implementation of a multi-modal small ne
 - **Parameter Efficient**: Total parameters capped at 100-500 million.
 - **Full Type Safety**: Complete type annotations with mypy compliance across all 23 source files. Zero type errors with strict static analysis ensuring runtime reliability and enhanced developer experience.
 - **Production Ready**: Comprehensive configuration management and environment variable support.
+- **Hardware Acceleration**: Automatic detection and support for NVIDIA GPUs (CUDA), AMD GPUs (ROCm), Apple Silicon (MPS), and NPUs (Intel AI Boost, AMD Ryzen AI, Apple Neural Engine).
+- **External Device Support**: Detects and utilizes external GPUs (eGPU via Thunderbolt/USB-C) and external NPUs (Coral Edge TPU, Intel Movidius NCS, Hailo AI).
+- **Flexible Device Configuration**: Auto-detection of optimal hardware or manual device selection with comprehensive fallback handling.
 
 ## Installation
 
 ### Prerequisites
 
 - Python 3.10+
-- CUDA 12.1+ or ROCm 5.7+
-- NVIDIA RTX 3060 (12GB) or equivalent AMD GPU
+- **GPU Support (Optional)**:
+  - NVIDIA: CUDA 12.1+ with RTX 3060 (12GB) or better
+  - AMD: ROCm 5.7+ with RX 6700 XT (12GB) or better
+  - Apple: M1/M2/M3 with Metal Performance Shaders (MPS)
+- **NPU Support (Optional)**:
+  - Intel AI Boost (Meteor Lake/Lunar Lake)
+  - AMD Ryzen AI (7040/8040 series)
+  - Apple Neural Engine (M1/M2/M3)
+  - Qualcomm Hexagon NPU (Snapdragon X)
+- **CPU**: Works on CPU-only systems (slower training)
 
 ### Setup
 
@@ -53,20 +64,39 @@ This repository contains an open-source implementation of a multi-modal small ne
 
 ## Quick Start
 
-1. Configure your environment:
+1. **Check your hardware** (detects internal and external devices):
+   ```python
+   # Check GPU availability (including eGPU via Thunderbolt/USB-C)
+   from src.utils.gpu_utils import detect_gpu_info, print_gpu_info
+   info = detect_gpu_info()
+   print_gpu_info(info)
+   
+   # Shows: GPU count, memory, external GPU detection, connection type
+   if info['external_gpu_count'] > 0:
+       print(f"External GPUs detected: {info['external_gpu_count']}")
+   
+   # Check NPU availability (including external NPUs like Coral Edge TPU)
+   from src.utils.npu_utils import detect_npu_info, print_npu_info
+   npu_info = detect_npu_info()
+   print_npu_info(npu_info)
+   
+   # Shows: NPU type, backend, internal/external status
+   ```
+
+2. Configure your environment:
    ```bash
    cp configs/default.yaml configs/my_config.yaml
    # Edit my_config.yaml with your settings
    ```
 
-2. Set up environment variables (see [Environment Setup](#environment-setup))
+3. Set up environment variables (see [Environment Setup](#environment-setup))
 
-3. Run the getting started notebook:
+4. Run the getting started notebook:
    ```bash
    jupyter notebook notebooks/01_getting_started.ipynb
    ```
 
-4. Train the model:
+5. Train the model:
    ```python
    from src.training.trainer import Trainer
    trainer = Trainer(config_path="configs/my_config.yaml")
@@ -130,13 +160,17 @@ multi-modal-neural-network/
 │   └── utils/                     # Utilities and helpers
 │       ├── config.py              # Configuration management
 │       ├── logging.py             # Logging utilities
-│       └── profiling.py           # Performance profiling
+│       ├── profiling.py           # Performance profiling
+│       ├── gpu_utils.py           # GPU detection and configuration
+│       └── npu_utils.py           # NPU detection and configuration
 ├── notebooks/
 │   ├── 01_getting_started.ipynb   # Setup and basic usage
 │   ├── 02_training.ipynb          # Training workflows
 │   └── 03_evaluation.ipynb        # Evaluation and analysis
 ├── tests/                         # Unit and integration tests
 ├── docs/                          # Documentation
+│   ├── GPU_TRAINING.md            # GPU configuration guide
+│   └── NPU_TRAINING.md            # NPU configuration guide
 └── examples/                      # Usage examples
 ```
 ## API Integration Framework
@@ -196,19 +230,133 @@ The model is configured via YAML files in the `configs/` directory. Key paramete
 
 See `configs/default.yaml` for a complete example.
 
+### Hardware Configuration
+
+The system automatically detects and configures available hardware accelerators. Configure in `configs/default.yaml`:
+
+```yaml
+hardware:
+  device: "auto"        # Auto-detect best device
+  # OR specify manually:
+  # device: "cuda"      # NVIDIA GPU
+  # device: "mps"       # Apple Silicon
+  # device: "npu"       # Neural Processing Unit
+  # device: "cpu"       # CPU fallback
+  
+  gpu_id: null          # Specify GPU index for multi-GPU systems (e.g., 0, 1)
+  prefer_npu: false     # Prefer NPU over GPU when both available
+```
+
+**Device Options:**
+- `"auto"`: Automatically selects the best available device (GPU > NPU > CPU)
+- `"cuda"` or `"cuda:0"`: NVIDIA GPU (specify index for multi-GPU)
+- `"mps"`: Apple Silicon Neural Engine
+- `"npu"`: Generic NPU (Intel AI Boost, AMD Ryzen AI, etc.)
+- `"openvino"`: Intel AI Boost via OpenVINO
+- `"ryzenai"`: AMD Ryzen AI
+- `"cpu"`: CPU-only mode
+
+**Hardware Detection (includes external devices):**
+```python
+from src.utils.gpu_utils import detect_gpu_info
+from src.utils.npu_utils import check_accelerator_availability, get_best_available_device
+
+# Detect all GPUs (internal + external eGPU)
+gpu_info = detect_gpu_info()
+print(f"Total GPUs: {gpu_info['device_count']}")
+print(f"External GPUs: {gpu_info['external_gpu_count']}")
+
+# Check what accelerators are available
+availability = check_accelerator_availability()
+print(f"CUDA (NVIDIA GPU): {availability['cuda']}")
+print(f"MPS (Apple Silicon): {availability['mps']}")
+print(f"NPU (Internal/External): {availability['npu']}")
+
+# Get recommended device
+device = get_best_available_device(prefer_npu=False)
+print(f"Recommended: {device}")
+```
+
+**External Device Support:**
+- **External GPUs (eGPU)**: Automatically detected via Thunderbolt 3/4, USB-C, or external PCIe
+  - Shows connection type and performance characteristics
+  - Works with all major eGPU enclosures (Razer Core, Sonnet, Akitio, etc.)
+- **External NPUs**: Detects USB/PCIe AI accelerators
+  - Google Coral Edge TPU (USB/M.2/PCIe)
+  - Intel Movidius Neural Compute Stick 2
+  - Hailo-8 AI Accelerator (PCIe)
+
+For detailed hardware setup guides:
+- **GPU Training**: See [docs/GPU_TRAINING.md](docs/GPU_TRAINING.md) - includes eGPU setup
+- **NPU Training**: See [docs/NPU_TRAINING.md](docs/NPU_TRAINING.md) - includes external NPU setup
+
 ## Training
 
 ### Hardware Requirements
 
-**Minimum:**
+**Minimum (GPU Training):**
 - GPU: NVIDIA RTX 3060 12GB or AMD RX 6700 XT 12GB
 - CPU: 6-core / 12-thread
 - RAM: 16GB
 
-**Recommended:**
+**Recommended (GPU Training):**
 - GPU: NVIDIA RTX 4070 12GB or RTX 3080 16GB
 - CPU: 8-core / 16-thread
 - RAM: 32GB
+
+**CPU-Only Training:**
+- CPU: 8-core / 16-thread or better
+- RAM: 32GB+
+- Note: Training will be significantly slower (10-50x)
+
+**NPU Inference (After Training):**
+- NPU: Intel AI Boost, AMD Ryzen AI, Apple Neural Engine, or Qualcomm Hexagon
+- RAM: 16GB+
+- Note: NPUs are optimized for inference, not training. Train on GPU/CPU, then export to ONNX for NPU deployment.
+
+**External Device Training/Inference:**
+- eGPU: Any desktop GPU in Thunderbolt 3/4 or USB-C enclosure
+  - Thunderbolt bandwidth: 40 Gbps (expect 10-25% slower than internal)
+  - Supports both training and inference
+- External NPU: Coral Edge TPU, Intel Movidius NCS2, Hailo-8
+  - USB 3.0/PCIe connection
+  - Inference only (export to ONNX/TFLite first)
+  - Ideal for prototyping edge deployments
+
+### Supported Hardware
+
+**NVIDIA GPUs (CUDA):**
+- RTX 40 Series: 4090, 4080, 4070 (Ada Lovelace)
+- RTX 30 Series: 3090, 3080, 3070, 3060 (Ampere)
+- RTX 20 Series: 2080 Ti, 2070 (Turing)
+- GTX 16 Series: 1660 Ti (Turing)
+- Data Center: A100, A40, V100, T4
+
+**AMD GPUs (ROCm):**
+- RX 7000 Series: 7900 XTX, 7900 XT (RDNA 3)
+- RX 6000 Series: 6900 XT, 6800 XT, 6700 XT (RDNA 2)
+- Instinct: MI250, MI100
+
+**Apple Silicon (MPS):**
+- M3 Max, M3 Pro, M3
+- M2 Ultra, M2 Max, M2 Pro, M2
+- M1 Ultra, M1 Max, M1 Pro, M1
+
+**Internal NPUs (Inference):**
+- Intel: AI Boost (Meteor Lake, Lunar Lake) - ~10 TOPS
+- AMD: Ryzen AI (Phoenix, Hawk Point) - ~10-16 TOPS
+- Apple: Neural Engine (M1/M2/M3) - up to 15.8 TOPS
+- Qualcomm: Hexagon NPU (Snapdragon X Elite/Plus) - ~45 TOPS
+
+**External NPUs (Inference):**
+- Google Coral Edge TPU (USB/M.2/PCIe) - 4 TOPS, ~$25-75
+- Intel Movidius Neural Compute Stick 2 (USB) - ~1 TOPS, ~$70-100
+- Hailo-8 AI Accelerator (PCIe/M.2) - 26 TOPS, ~$200-300
+
+**External GPUs (eGPU Enclosures):**
+- Thunderbolt 3/4: Razer Core X, Sonnet eGFX, Akitio Node
+- Compatible with any desktop GPU (NVIDIA/AMD)
+- Expect 10-25% performance reduction vs internal GPU
 
 ### Training Command
 

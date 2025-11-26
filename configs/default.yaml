@@ -87,10 +87,18 @@ logging:
   eval_every: 10000
 
 hardware:
-  device: "cuda"
+  device: "auto"  # Options: "auto", "cuda", "cpu", "npu", "mps", "cuda:0", etc.
+  # Set device to "auto" to automatically detect and use best accelerator
+  # Set to "cpu" to force CPU training
+  # Set to "cuda" for NVIDIA GPU
+  # Set to "npu" to use Neural Processing Unit (Intel AI Boost, AMD Ryzen AI, etc.)
+  # Set to "mps" for Apple Silicon Neural Engine
+  # Set to specific GPU like "cuda:0" for multi-GPU systems
+  gpu_id: null  # Specific GPU ID (0, 1, 2, etc.) or null for auto-select
+  prefer_npu: false  # If true, prefer NPU over GPU when both available
   max_memory: "11GB"
   compile_model: true
-  ddp: false
+  ddp: false  # Distributed Data Parallel (multi-GPU training)
 
 paths:
   output_dir: "./outputs"
