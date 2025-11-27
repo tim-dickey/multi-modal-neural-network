@@ -69,6 +69,17 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
     lr = training_config.get("inner_lr", 3e-4)
     weight_decay = training_config.get("weight_decay", 0.01)
 
+    # Normalize types from config (strings -> floats)
+    try:
+        lr = float(lr)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid learning rate: {lr}")
+
+    try:
+        weight_decay = float(weight_decay)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid weight_decay: {weight_decay}")
+
     # Get parameter groups with proper weight decay
     param_groups = get_parameter_groups(model, weight_decay)
 
