@@ -1,5 +1,6 @@
 # Multi-Modal Neural Network with Double-Loop Learning
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/0d4cb051d4d142fb908ef383cecce117)](https://app.codacy.com/gh/tim-dickey/multi-modal-neural-network?utm_source=github.com&utm_medium=referral&utm_content=tim-dickey/multi-modal-neural-network&utm_campaign=Badge_Grade)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-red.svg)](https://pytorch.org/)
