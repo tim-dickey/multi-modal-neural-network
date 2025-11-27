@@ -264,92 +264,61 @@ class Trainer:
         if self.wandb_logger:
             self.wandb_logger.finish()
 
-    def train_epoch(self) -> Dict[str, float]:
+    def train_epoch(self, epoch: int) -> Dict[str, float]:
         """Train for one epoch."""
         self.model.train()
-
         total_loss = 0.0
-        total_correct: float = 0.0
+        total_correct = 0
         total_samples = 0
 
-        progress_bar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch}")
-
-        for batch_idx, batch in enumerate(progress_bar):
-            # Move batch to device
-            batch = {
-                k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                for k, v in batch.items()
-            }
-
-            # Forward pass
-            if self.use_amp:
-                with torch.cuda.amp.autocast():
-                    loss, accuracy = self.train_step(batch)
-            else:
-                loss, accuracy = self.train_step(batch)
-
-            # Backward pass
-            self.optimizer.zero_grad()
-
-            if self.use_amp:
-                self.scaler.scale(loss).backward()
-                self.scaler.unscale_(self.optimizer)
-                grad_norm = self.grad_clipper(self.model.parameters())
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-            else:
-                loss.backward()
-                grad_norm = self.grad_clipper(self.model.parameters())
-                self.optimizer.step()
-
-            # Update scheduler
-            if self.scheduler_update_freq == "step":
-                self.scheduler.step()
-
-            # Update metrics
-            total_loss += loss.item()
-            label_tensor = batch.get("labels") if "labels" in batch else batch.get("label")
-            if isinstance(label_tensor, torch.Tensor):
-                bs = label_tensor.size(0)
-                total_correct += accuracy.item() * bs
-                total_samples += bs
-
-            # Log progress
-            avg_loss = total_loss / (batch_idx + 1)
-            avg_acc = total_correct / total_samples
-            progress_bar.set_postfix(
-                {
-                    "loss": f"{avg_loss:.4f}",
-                    "acc": f"{avg_acc:.4f}",
-                    "lr": f'{self.optimizer.param_groups[0]["lr"]:.6f}',
-                }
+        # Guard: empty data loader
+        if not hasattr(self, "train_loader") or self.train_loader is None:
+            raise ValueError("Trainer.train_loader is not initialized.")
+        if len(self.train_loader) == 0:
+            raise ValueError(
+                "Training data loader is empty. Check your config:\n"
+                "  - data.train_path exists and has files\n"
+                "  - data.batch_size > 0\n"
+                "  - dataset split is not empty\n"
             )
 
-            # Log to wandb
-            if (
-                self.wandb_logger
-                and batch_idx % self.config.get("logging", {}).get("log_every", 50) == 0
-            ):
-                self.wandb_logger.log(
-                    {
-                        "train/loss": loss.item(),
-                        "train/accuracy": accuracy.item(),
-                        "train/learning_rate": self.optimizer.param_groups[0]["lr"],
-                        "train/gradient_norm": grad_norm,
-                    },
-                    step=self.global_step,
+        for batch_idx, batch in enumerate(self.train_loader):
+            # Move batch to device
+            batch = {k: (v.to(self.device) if isinstance(v, torch.Tensor) else v)
+                     for k, v in batch.items()}
+
+            self.optimizer.zero_grad()
+            outputs = self.model(batch)
+            loss = self.criterion(outputs, batch["labels"])
+
+            loss.backward()
+
+            # Optional gradient clipping
+            clip_val = self.config.get("training", {}).get("gradient_clip", 0.0)
+            if clip_val and clip_val > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), clip_val)
+
+            self.optimizer.step()
+
+            # Metrics
+            total_loss += float(loss.item())
+            preds = outputs.argmax(dim=-1)
+            total_correct += int((preds == batch["labels"]).sum().item())
+            total_samples += int(batch["labels"].size(0))
+
+            if batch_idx % int(self.config.get("training", {}).get("log_interval", 10)) == 0:
+                self.logger.info(
+                    f"Epoch {epoch} [{batch_idx}/{len(self.train_loader)}] "
+                    f"Loss: {loss.item():.4f}"
                 )
 
-            self.global_step += 1
-
-        # Update scheduler if per-epoch
-        if self.scheduler_update_freq == "epoch":
-            self.scheduler.step()
-
-        return {
-            "loss": total_loss / len(self.train_loader),
-            "accuracy": total_correct / total_samples,
+        # Safe averaging
+        num_batches = max(1, len(self.train_loader))
+        metrics = {
+            "loss": total_loss / num_batches,
+            "accuracy": (total_correct / total_samples) if total_samples > 0 else 0.0,
         }
+        return metrics
 
     def _normalize_batch(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize batch keys to a consistent schema expected by the model/trainer.
