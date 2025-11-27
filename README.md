@@ -290,6 +290,59 @@ For detailed hardware setup guides:
 - **GPU Training**: See [docs/GPU_TRAINING.md](docs/GPU_TRAINING.md) - includes eGPU setup
 - **NPU Training**: See [docs/NPU_TRAINING.md](docs/NPU_TRAINING.md) - includes external NPU setup
 
+## Dataset Selection
+
+You can assemble training/validation/test sets from multiple datasets declaratively in `configs/default.yaml` using the `data.datasets` list. Example:
+
+```yaml
+data:
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  datasets:
+    - name: multimodal_core
+      type: multimodal
+      data_dir: ./data/multimodal
+      splits: {train: 0.8, val: 0.1, test: 0.1}
+      enabled: true
+    - name: captions_aux
+      type: coco_captions
+      root: ./data/coco/images
+      ann_file: ./data/coco/annotations/captions_train2017.json
+      splits: {train: 1.0}
+      use_in: [train]
+      enabled: true
+```
+
+Key fields:
+
+- `type`: One of `multimodal`, `coco_captions`, `imagenet` (mapped to internal dataset classes).
+- `splits`: Mapping of split name to ratio; must sum to 1.0. Omit for implicit `{train: 1.0}`.
+- `use_in`: Optional restriction of which splits this dataset contributes to.
+- `enabled`: Toggle inclusion without deleting entry.
+
+Disable a dataset:
+
+```yaml
+    - name: captions_aux
+      type: coco_captions
+      # ...
+      enabled: false
+```
+
+Programmatic usage inside notebooks or scripts:
+
+```python
+from src.utils.config import load_config
+from src.data import build_dataloaders
+
+config = load_config("configs/default.yaml")
+train_loader, val_loader, test_loader = build_dataloaders(config)
+print(len(train_loader), len(val_loader or []), len(test_loader or []))
+```
+
+If `data.datasets` is present, the `Trainer` automatically uses the selector; otherwise it falls back to legacy single-dataset keys (`train_dataset`, `val_dataset`).
+
 ## Training
 
 ### Hardware Requirements

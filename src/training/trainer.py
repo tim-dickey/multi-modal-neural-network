@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..data.dataset import create_dataloader, create_dataset_from_config
+from ..data.selector import build_dataloaders
 from ..models.multi_modal_model import MultiModalModel, create_multi_modal_model
 from ..training.losses import MetaLoss, create_loss_function
 from ..training.optimizer import (
@@ -140,39 +141,50 @@ class Trainer:
         self.model.to(self.device)
         log_model_info(self.logger, self.model)
 
-        # Resolve data loaders
-        # Declare loader attributes once for consistent typing
+        # Resolve data loaders (selector-aware)
         self.train_loader: Any
         self.val_loader: Optional[Any]
+        self.test_loader: Optional[Any]
+        data_section = self.config.get("data", {})
         if train_loader is None and val_loader is None:
-            self.logger.info("Loading datasets...")
-            train_dataset, val_dataset = create_dataset_from_config(self.config)
-
-            data_config = self.config.get("data", {})
-            self.train_loader = create_dataloader(
-                train_dataset,
-                batch_size=data_config.get("batch_size", 32),
-                num_workers=data_config.get("num_workers", 4),
-                shuffle=True,
-                pin_memory=data_config.get("pin_memory", True),
-            )
-
-            self.val_loader = create_dataloader(
-                val_dataset,
-                batch_size=data_config.get("batch_size", 32),
-                num_workers=data_config.get("num_workers", 4),
-                shuffle=False,
-                pin_memory=data_config.get("pin_memory", True),
-            )
-            try:
-                self.logger.info(f"Train samples: {len(train_dataset)}")  # type: ignore
-                self.logger.info(f"Val samples: {len(val_dataset)}")  # type: ignore
-            except Exception:
-                pass
+            if "datasets" in data_section:
+                self.logger.info("Building dataloaders via selector...")
+                self.train_loader, self.val_loader, self.test_loader = build_dataloaders(self.config)
+                self.logger.info(
+                    "Selector data built: train=%d val=%d test=%d",
+                    len(self.train_loader),
+                    len(self.val_loader) if self.val_loader else 0,
+                    len(self.test_loader) if self.test_loader else 0,
+                )
+            else:
+                self.logger.info("Loading datasets (legacy path)...")
+                train_dataset, val_dataset = create_dataset_from_config(self.config)
+                data_config = data_section
+                self.train_loader = create_dataloader(
+                    train_dataset,
+                    batch_size=data_config.get("batch_size", 32),
+                    num_workers=data_config.get("num_workers", 4),
+                    shuffle=True,
+                    pin_memory=data_config.get("pin_memory", True),
+                )
+                self.val_loader = create_dataloader(
+                    val_dataset,
+                    batch_size=data_config.get("batch_size", 32),
+                    num_workers=data_config.get("num_workers", 4),
+                    shuffle=False,
+                    pin_memory=data_config.get("pin_memory", True),
+                )
+                self.test_loader = None
+                try:
+                    self.logger.info(f"Train samples: {len(train_dataset)}")  # type: ignore
+                    self.logger.info(f"Val samples: {len(val_dataset)}")  # type: ignore
+                except Exception:
+                    pass
         else:
-            # Use provided loaders as-is; do not auto-create datasets
+            # Use provided loaders as-is
             self.train_loader = train_loader if train_loader is not None else []
             self.val_loader = val_loader
+            self.test_loader = None
 
         # Create loss function
         self.criterion = create_loss_function(self.config)
@@ -229,7 +241,7 @@ class Trainer:
             self.current_epoch = epoch
 
             # Train one epoch
-            train_metrics = self.train_epoch()
+            train_metrics = self.train_epoch(epoch)
 
             # Validate
             val_metrics = self.validate()

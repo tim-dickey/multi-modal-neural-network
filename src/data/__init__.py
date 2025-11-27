@@ -1,4 +1,9 @@
-"""Data loading and preprocessing."""
+"""Data loading and preprocessing.
+
+Exports dataset classes, legacy helper creation functions, and the new
+`build_dataloaders` selector utility for assembling multi-source train/val/test
+loaders from the configuration.
+"""
 
 from .dataset import (
     COCOCaptionsDataset,
@@ -7,6 +12,7 @@ from .dataset import (
     create_dataloader,
     create_dataset_from_config,
 )
+from .selector import build_dataloaders
 
 __all__ = [
     "MultiModalDataset",
@@ -14,4 +20,5 @@ __all__ = [
     "ImageNetDataset",
     "create_dataloader",
     "create_dataset_from_config",
+    "build_dataloaders",
 ]
