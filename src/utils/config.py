@@ -23,7 +23,7 @@ def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = cast(Dict[str, Any], yaml.safe_load(f))
 
     # Resolve environment variables
@@ -43,9 +43,60 @@ def _resolve_env_vars(config: Any) -> Any:
         if config.startswith("${") and config.endswith("}"):
             var_name = config[2:-1]
             return os.environ.get(var_name, config)
+        # Replace ~/ with user home directory (cross-platform)
+        elif config.startswith("~/"):
+            return str(Path.home() / config[2:])
         return config
     else:
         return config
+
+
+def get_project_root() -> Path:
+    """
+    Get the project root directory.
+    
+    Returns:
+        Path to project root
+    """
+    # Try to find .git directory
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    
+    # Fallback to parent of src directory
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def resolve_path(path: Union[str, Path], relative_to: Union[str, Path, None] = None) -> Path:
+    """
+    Resolve a path, handling user home directory and relative paths.
+    
+    Args:
+        path: Path to resolve
+        relative_to: Base path for relative paths (defaults to project root)
+        
+    Returns:
+        Resolved absolute path
+    """
+    path = Path(path)
+    
+    # If absolute, return as-is
+    if path.is_absolute():
+        return path
+    
+    # Expand user home directory
+    if str(path).startswith("~"):
+        return path.expanduser()
+    
+    # Make relative to project root or specified base
+    if relative_to is None:
+        relative_to = get_project_root()
+    else:
+        relative_to = Path(relative_to)
+    
+    return (relative_to / path).resolve()
 
 
 def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
@@ -59,7 +110,7 @@ def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(save_path, "w") as f:
+    with open(save_path, "w", encoding="utf-8") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 
