@@ -139,6 +139,7 @@ class VisionEncoder(nn.Module):
         num_heads: int = 8,
         mlp_ratio: float = 4.0,
         dropout: float = 0.1,
+        *,
         use_cls_token: bool = True,
     ):
         super().__init__()

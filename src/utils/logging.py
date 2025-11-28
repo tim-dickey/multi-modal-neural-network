@@ -131,6 +131,7 @@ class WandbLogger:
         project: str,
         experiment: str,
         config: dict[str, Any],
+        *,
         enabled: bool = True,
     ) -> None:
         """Initialize a lightweight wandb wrapper."""
@@ -138,7 +139,7 @@ class WandbLogger:
 
         if self.enabled:
             try:
-                import wandb
+                import wandb  # noqa: PLC0415
 
                 self.wandb = wandb
                 self.run = wandb.init(project=project, name=experiment, config=config)
@@ -159,7 +160,7 @@ class WandbLogger:
         if self.enabled:
             self.wandb.log(metrics, step=step)
 
-    def log_image(self, key: str, image: object, step: int | None = None) -> None:
+    def log_image(self, key: str, image: Any, step: int | None = None) -> None:
         """Log image to wandb."""
         if self.enabled:
             self.wandb.log({key: self.wandb.Image(image)}, step=step)

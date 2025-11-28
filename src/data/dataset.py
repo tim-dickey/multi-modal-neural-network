@@ -48,6 +48,7 @@ class MultiModalDataset(Dataset):
         img_size: int = 224,
         max_text_length: int = 512,
         tokenizer: Optional[Any] = None,
+        *,
         augment: bool = True,
     ):
         super().__init__()
@@ -252,6 +253,7 @@ class ImageNetDataset(Dataset):
         data_path: str,
         split: str = "train",
         img_size: int = 224,
+        *,
         augment: bool = True,
     ):
         super().__init__()
@@ -331,6 +333,7 @@ def create_dataloader(
     dataset: Dataset,
     batch_size: int = 32,
     num_workers: int = 4,
+    *,
     shuffle: bool = True,
     pin_memory: bool = True,
     drop_last: bool = True,
@@ -420,6 +423,7 @@ def create_data_loaders(
     val_dataset: Dataset,
     batch_size: int = 32,
     num_workers: int = 4,
+    *,
     pin_memory: bool = True,
 ) -> Tuple[DataLoader, DataLoader]:
     """
@@ -456,7 +460,7 @@ def create_data_loaders(
     return train_loader, val_loader
 
 
-def get_transforms(config: Dict, is_train: bool = True) -> transforms.Compose:
+def get_transforms(config: Dict, *, is_train: bool = True) -> transforms.Compose:
     """
     Get image transforms based on configuration.
 

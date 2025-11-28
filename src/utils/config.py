@@ -3,12 +3,12 @@
 import copy
 import os
 from pathlib import Path
-from typing import Any, Dict, Union, cast
+from typing import Any, cast
 
 import yaml
 
 
-def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
+def load_config(config_path: str | Path) -> dict[str, Any]:
     """
     Load configuration from YAML file.
 
@@ -23,11 +23,11 @@ def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = cast(Dict[str, Any], yaml.safe_load(f))
+    with config_path.open("r", encoding="utf-8") as f:
+        config = cast(dict[str, Any], yaml.safe_load(f))
 
     # Resolve environment variables
-    config = cast(Dict[str, Any], _resolve_env_vars(config))
+    config = cast(dict[str, Any], _resolve_env_vars(config))
 
     return config
 
@@ -69,9 +69,7 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
-def resolve_path(
-    path: Union[str, Path], relative_to: Union[str, Path, None] = None
-) -> Path:
+def resolve_path(path: str | Path, relative_to: str | Path | None = None) -> Path:
     """
     Resolve a path, handling user home directory and relative paths.
 
@@ -101,7 +99,7 @@ def resolve_path(
     return (relative_to / path).resolve()
 
 
-def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
+def save_config(config: dict[str, Any], save_path: str | Path) -> None:
     """
     Save configuration to YAML file.
 
@@ -112,13 +110,13 @@ def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(save_path, "w", encoding="utf-8") as f:
+    with save_path.open("w", encoding="utf-8") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 
 def merge_configs(
-    base_config: Dict[str, Any], override_config: Dict[str, Any]
-) -> Dict[str, Any]:
+    base_config: dict[str, Any], override_config: dict[str, Any]
+) -> dict[str, Any]:
     """
     Merge two configurations, with override_config taking precedence.
 
@@ -140,7 +138,7 @@ def merge_configs(
     return result
 
 
-def validate_config(config: Dict[str, Any]) -> bool:
+def validate_config(config: dict[str, Any]) -> bool:
     """
     Validate configuration has required fields.
 
@@ -176,14 +174,14 @@ def validate_config(config: Dict[str, Any]) -> bool:
 class ConfigNamespace:
     """Convert dictionary config to namespace for easier access."""
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         for key, value in config.items():
             if isinstance(value, dict):
                 setattr(self, key, ConfigNamespace(value))
             else:
                 setattr(self, key, value)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert namespace back to dictionary."""
         result = {}
         for key, value in self.__dict__.items():
