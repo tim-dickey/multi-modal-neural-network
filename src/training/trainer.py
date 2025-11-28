@@ -299,7 +299,9 @@ class Trainer:
         self.best_val_loss = float("inf")
 
     def _init_amp_and_resume(self, resume_from: Optional[str]) -> None:
-        """Initialize mixed-precision utilities and optionally resume from checkpoint."""
+        """Initialize mixed-precision utilities and optionally
+        resume from checkpoint.
+        """
         # Mixed precision training
         self.use_amp = (
             self.config.get("training", {}).get("mixed_precision", "bf16") is not None

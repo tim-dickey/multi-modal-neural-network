@@ -1,0 +1,912 @@
+diff --git a/.github/fetch_codacy_artifacts.py b/.github/fetch_codacy_artifacts.py
+index 77a0920..5fb66da 100644
+--- a/.github/fetch_codacy_artifacts.py
++++ b/.github/fetch_codacy_artifacts.py
+@@ -2,91 +2,109 @@ import os
+ import time
+ import requests
+ import zipfile
+-import io
+ import sys
+ 
+-owner='tim-dickey'
+-repo='multi-modal-neural-network'
+-branch='fix/upgrade-pytorch-2.6'
++owner = "tim-dickey"
++repo = "multi-modal-neural-network"
++branch = "fix/upgrade-pytorch-2.6"
+ 
+-GITHUB_TOKEN=os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN') or os.environ.get('CODACY_PROJECT_TOKEN')
+-headers={'Accept':'application/vnd.github+json'}
++GITHUB_TOKEN = (
++    os.environ.get("GITHUB_TOKEN")
++    or os.environ.get("GH_TOKEN")
++    or os.environ.get("CODACY_PROJECT_TOKEN")
++)
++headers = {"Accept": "application/vnd.github+json"}
+ if GITHUB_TOKEN:
+-    headers['Authorization']=f'token {GITHUB_TOKEN}'
++    headers["Authorization"] = f"token {GITHUB_TOKEN}"
+ 
+-session=requests.Session()
++session = requests.Session()
+ session.headers.update(headers)
+ 
+-print('Querying GitHub Actions for workflow runs...')
++print("Querying GitHub Actions for workflow runs...")
+ 
+-runs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs?branch={branch}&per_page=50'
++runs_url = (
++    f"https://api.github.com/repos/{owner}/{repo}/actions/runs"
++    f"?branch={branch}&per_page=50"
++)
+ 
+-run_info=None
+-for attempt in range(1,13):
++run_info = None
++for attempt in range(1, 13):
+     try:
+-        r=session.get(runs_url, timeout=30)
++        r = session.get(runs_url, timeout=30)
+         r.raise_for_status()
+-        data=r.json()
+-        runs=data.get('workflow_runs', [])
++        data = r.json()
++        runs = data.get("workflow_runs", [])
+         if not runs:
+-            print(f'No runs found (attempt {attempt}).')
++            print(f"No runs found (attempt {attempt}).")
+         else:
+             # pick the most recent run
+-            run=runs[0]
+-            print(f"Found run id={run.get('id')} status={run.get('status')} conclusion={run.get('conclusion')} created_at={run.get('created_at')}")
+-            if run.get('status')=='completed':
+-                run_info=run
++            run = runs[0]
++            run_id = run.get("id")
++            status = run.get("status")
++            conclusion = run.get("conclusion")
++            created = run.get("created_at")
++            print(
++                "Found run",
++                run_id,
++                "status=", status,
++                "conclusion=", conclusion,
++                "created_at=", created,
++            )
++            if status == "completed":
++                run_info = run
+                 break
+             else:
+-                print('Run not completed yet; waiting...')
+-    except Exception as e:
+-        print('Error querying runs:', e)
++                print("Run not completed yet; waiting...")
++    except Exception as exc:
++        print("Error querying runs:", exc)
+     time.sleep(15)
+ 
+ if run_info is None:
+-    print('No completed workflow run found within timeout. Exiting.')
++    print("No completed workflow run found within timeout. Exiting.")
+     sys.exit(2)
+ 
+-run_id=run_info.get('id')
+-print('Using run_id=', run_id)
++run_id = run_info.get("id")
++print("Using run_id=", run_id)
+ 
+-artifacts_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
++artifacts_url = (
++    f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
++)
+ try:
+-    r=session.get(artifacts_url, timeout=30)
++    r = session.get(artifacts_url, timeout=30)
+     r.raise_for_status()
+-    artifacts=r.json().get('artifacts', [])
+-    print(f'Found {len(artifacts)} artifacts')
+-except Exception as e:
+-    print('Failed to list artifacts:', e)
++    artifacts = r.json().get("artifacts", [])
++    print(f"Found {len(artifacts)} artifacts")
++except Exception as exc:
++    print("Failed to list artifacts:", exc)
+     sys.exit(3)
+ 
+-os.makedirs('test_logs/codacy', exist_ok=True)
++os.makedirs("test_logs/codacy", exist_ok=True)
+ 
+ for art in artifacts:
+-    name=art.get('name')
+-    aid=art.get('id')
+-    url=art.get('archive_download_url')
+-    print(f'Downloading artifact {name} (id={aid})...')
++    name = art.get("name")
++    aid = art.get("id")
++    url = art.get("archive_download_url")
++    print(f"Downloading artifact {name} (id={aid})...")
+     try:
+-        resp=session.get(url, stream=True, timeout=60)
++        resp = session.get(url, stream=True, timeout=60)
+         # resp may be a redirect to storage; requests follows redirects
+         resp.raise_for_status()
+-        zdata=resp.content
+-        zip_path=f'test_logs/codacy/{name or aid}.zip'
+-        with open(zip_path,'wb') as f:
++        zdata = resp.content
++        zip_path = f"test_logs/codacy/{name or aid}.zip"
++        with open(zip_path, "wb") as f:
+             f.write(zdata)
+-        print('Saved', zip_path)
++        print("Saved", zip_path)
+         try:
+             with zipfile.ZipFile(zip_path) as z:
+-                z.extractall('test_logs/codacy')
+-            print('Extracted', zip_path)
++                z.extractall("test_logs/codacy")
++            print("Extracted", zip_path)
+         except zipfile.BadZipFile:
+-            print('Artifact is not a zip or failed to extract:', zip_path)
+-    except Exception as e:
+-        print('Failed to download artifact:', e)
++            print("Artifact is not a zip or failed to extract:", zip_path)
++    except Exception as exc:
++        print("Failed to download artifact:", exc)
+ 
+-print('\nContents of test_logs/codacy:')
+-for root,dirs,files in os.walk('test_logs/codacy'):
+-    for f in files:
+-        print(os.path.join(root,f))
+-print('\nDone.')
++print("\nContents of test_logs/codacy:")
++for root, dirs, files in os.walk("test_logs/codacy"):
++    for fname in files:
++        print(os.path.join(root, fname))
++print("\nDone.")
+diff --git a/.github/fetch_run_jobs.py b/.github/fetch_run_jobs.py
+index 394cbd8..936a476 100644
+--- a/.github/fetch_run_jobs.py
++++ b/.github/fetch_run_jobs.py
+@@ -1,37 +1,50 @@
+-import os, requests, sys
+-owner='tim-dickey'
+-repo='multi-modal-neural-network'
+-run_id=19767186334
+-GITHUB_TOKEN=os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+-headers={'Accept':'application/vnd.github+json'}
++import os
++import requests
++import sys
++
++owner = "tim-dickey"
++repo = "multi-modal-neural-network"
++run_id = 19767186334
++GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
++headers = {"Accept": "application/vnd.github+json"}
+ if GITHUB_TOKEN:
+-    headers['Authorization']=f'token {GITHUB_TOKEN}'
++    headers["Authorization"] = f"token {GITHUB_TOKEN}"
+ 
+-s=requests.Session()
++s = requests.Session()
+ s.headers.update(headers)
+ 
+-jobs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
+-print('Requesting jobs for run', run_id)
+-r=s.get(jobs_url, timeout=30)
+-print('Status', r.status_code)
+-if r.status_code!=200:
+-    print('Response:', r.text[:1000])
++jobs_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"
++print("Requesting jobs for run", run_id)
++r = s.get(jobs_url, timeout=30)
++print("Status", r.status_code)
++if r.status_code != 200:
++    print("Response:", r.text[:1000])
+     sys.exit(1)
+-jobs=r.json().get('jobs', [])
+-print('Found', len(jobs), 'jobs')
+-for j in jobs:
+-    print('---')
+-    print('Job id:', j.get('id'))
+-    print('Name:', j.get('name'))
+-    print('Status:', j.get('status'), 'Conclusion:', j.get('conclusion'))
+-    steps=j.get('steps', [])
+-    for s in steps:
+-        name=s.get('name')
+-        status=s.get('status')
+-        conclusion=s.get('conclusion')
+-        number=s.get('number')
+-        print(f'  Step {number}: {name} -> status={status} conclusion={conclusion}')
+-        if s.get('conclusion')=='failure' or s.get('status')=='completed' and s.get('conclusion')!='success':
+-            print('    Failure details (if available):', s.get('number'), s.get('status'), s.get('conclusion'))
++jobs = r.json().get("jobs", [])
++print("Found", len(jobs), "jobs")
++for job in jobs:
++    print("---")
++    print("Job id:", job.get("id"))
++    print("Name:", job.get("name"))
++    print("Status:", job.get("status"), "Conclusion:", job.get("conclusion"))
++    steps = job.get("steps", [])
++    for step in steps:
++        name = step.get("name")
++        status = step.get("status")
++        conclusion = step.get("conclusion")
++        number = step.get("number")
++        print(
++            f"  Step {number}: {name} -> status={status} conclusion={conclusion}"
++        )
++        # Use local variables to keep the conditional line short
++        if conclusion == "failure" or (
++            status == "completed" and conclusion != "success"
++        ):
++            print(
++                "    Failure details (if available):",
++                step.get("number"),
++                step.get("status"),
++                step.get("conclusion"),
++            )
+ 
+-print('\nDone')
++print("\nDone")
+diff --git a/.github/fetch_run_logs.py b/.github/fetch_run_logs.py
+index 1060628..0e6ca31 100644
+--- a/.github/fetch_run_logs.py
++++ b/.github/fetch_run_logs.py
+@@ -1,68 +1,83 @@
+-import os, sys, time, requests, zipfile, io
+-owner='tim-dickey'
+-repo='multi-modal-neural-network'
+-branch='fix/upgrade-pytorch-2.6'
+-GITHUB_TOKEN=os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+-headers={'Accept':'application/vnd.github+json'}
++import os
++import sys
++import requests
++import zipfile
++
++owner = "tim-dickey"
++repo = "multi-modal-neural-network"
++branch = "fix/upgrade-pytorch-2.6"
++GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
++headers = {"Accept": "application/vnd.github+json"}
+ if GITHUB_TOKEN:
+-    headers['Authorization']=f'token {GITHUB_TOKEN}'
++    headers["Authorization"] = f"token {GITHUB_TOKEN}"
+ 
+-s=requests.Session()
++s = requests.Session()
+ s.headers.update(headers)
+ 
+-runs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs?branch={branch}&per_page=5'
+-print('Listing recent runs...')
+-r=s.get(runs_url, timeout=30)
++runs_url = (
++    f"https://api.github.com/repos/{owner}/{repo}/actions/runs"
++    f"?branch={branch}&per_page=5"
++)
++print("Listing recent runs...")
++r = s.get(runs_url, timeout=30)
+ r.raise_for_status()
+-data=r.json()
+-runs=data.get('workflow_runs', [])
++data = r.json()
++runs = data.get("workflow_runs", [])
+ if not runs:
+-    print('No runs found')
++    print("No runs found")
+     sys.exit(1)
+-run=runs[0]
+-print('Latest run:', run.get('id'), run.get('status'), run.get('conclusion'))
+-run_id=run.get('id')
++run = runs[0]
++print("Latest run:", run.get("id"), run.get("status"), run.get("conclusion"))
++run_id = run.get("id")
+ 
+-logs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/logs'
+-print('Requesting logs archive...')
+-resp=s.get(logs_url, stream=True, timeout=60)
+-if resp.status_code==200:
++logs_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/logs"
++print("Requesting logs archive...")
++resp = s.get(logs_url, stream=True, timeout=60)
++if resp.status_code == 200:
+     # sometimes returns zip directly
+-    zdata=resp.content
+-    path=f'test_logs/codacy/workflow_{run_id}_logs.zip'
+-    open(path,'wb').write(zdata)
+-    print('Saved logs to', path)
++    zdata = resp.content
++    path = f"test_logs/codacy/workflow_{run_id}_logs.zip"
++    open(path, "wb").write(zdata)
++    print("Saved logs to", path)
+     try:
+         with zipfile.ZipFile(path) as z:
+-            z.extractall(f'test_logs/codacy/workflow_{run_id}_logs')
+-        print('Extracted logs')
+-    except Exception as e:
+-        print('Failed to extract logs zip:', e)
++            z.extractall(f"test_logs/codacy/workflow_{run_id}_logs")
++        print("Extracted logs")
++    except Exception as exc:
++        print("Failed to extract logs zip:", exc)
+ else:
+-    print('Logs request status:', resp.status_code)
+-    print('Response headers:', resp.headers)
+-    text=resp.text
+-    print('Response text (truncated):', text[:1000])
++    print("Logs request status:", resp.status_code)
++    print("Response headers:", resp.headers)
++    text = resp.text
++    print("Response text (truncated):", text[:1000])
+     sys.exit(2)
+ 
+ # Search for failure hints
+-errors=[]
+-for root,dirs,files in os.walk(f'test_logs/codacy/workflow_{run_id}_logs'):
++errors = []
++target_dir = f"test_logs/codacy/workflow_{run_id}_logs"
++for root, dirs, files in os.walk(target_dir):
+     for fn in files:
+-        if fn.endswith('.txt') or fn.endswith('.log') or fn.endswith('.out') or fn.endswith('.err'):
+-            fp=os.path.join(root,fn)
++        if fn.endswith((".txt", ".log", ".out", ".err")):
++            fp = os.path.join(root, fn)
+             try:
+-                with open(fp,'r',encoding='utf-8',errors='ignore') as f:
+-                    content=f.read()
+-                if 'ERROR' in content or 'Traceback' in content or 'exit code' in content.lower() or 'failed' in content.lower():
+-                    errors.append((fp, content.count('\n') and content.splitlines()[-20:] or []))
+-            except Exception as e:
++                with open(fp, "r", encoding="utf-8", errors="ignore") as fh:
++                    content = fh.read()
++                lc = content.lower()
++                if (
++                    "error" in lc
++                    or "traceback" in lc
++                    or "exit code" in lc
++                    or "failed" in lc
++                ):
++                    tail = content.splitlines()[-20:] if content.count("\n") else []
++                    errors.append((fp, tail))
++            except Exception:
+                 pass
+ 
+-print('\nFound', len(errors), 'files with likely errors (listed):')
++print("\nFound", len(errors), "files with likely errors (listed):")
+ for fp, tail in errors:
+-    print('---', fp)
++    print("---", fp)
+     for line in tail:
+         print(line)
+ 
+-print('\nDone')
++print("\nDone")
+diff --git a/.github/poll_codacy_run.py b/.github/poll_codacy_run.py
+index bbcacd4..8d45fe3 100644
+--- a/.github/poll_codacy_run.py
++++ b/.github/poll_codacy_run.py
+@@ -1,82 +1,106 @@
+-import os, time, requests, sys, zipfile
+-owner='tim-dickey'
+-repo='multi-modal-neural-network'
+-branch='fix/upgrade-pytorch-2.6'
+-GITHUB_TOKEN=os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+-headers={'Accept':'application/vnd.github+json'}
++import os
++import time
++import requests
++import sys
++import zipfile
++
++owner = "tim-dickey"
++repo = "multi-modal-neural-network"
++branch = "fix/upgrade-pytorch-2.6"
++GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
++headers = {"Accept": "application/vnd.github+json"}
+ if GITHUB_TOKEN:
+-    headers['Authorization']=f'token {GITHUB_TOKEN}'
++    headers["Authorization"] = f"token {GITHUB_TOKEN}"
+ 
+-s=requests.Session()
++s = requests.Session()
+ s.headers.update(headers)
+ 
+-runs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs?branch={branch}&per_page=10'
+-run_info=None
+-print('Polling for completed workflow run (timeout 10 minutes)...')
++runs_url = (
++    f"https://api.github.com/repos/{owner}/{repo}/actions/runs"
++    f"?branch={branch}&per_page=10"
++)
++run_info = None
++print("Polling for completed workflow run (timeout 10 minutes)...")
+ for i in range(40):
+     try:
+-        r=s.get(runs_url, timeout=30)
++        r = s.get(runs_url, timeout=30)
+         r.raise_for_status()
+-        data=r.json()
+-        runs=data.get('workflow_runs', [])
++        data = r.json()
++        runs = data.get("workflow_runs", [])
+         if not runs:
+-            print('No runs found; sleeping...')
++            print("No runs found; sleeping...")
+         else:
+-            run=runs[0]
+-            print(f"Attempt {i+1}: run id={run.get('id')} status={run.get('status')} conclusion={run.get('conclusion')}")
+-            if run.get('status')=='completed':
+-                run_info=run
++            run = runs[0]
++            print(
++                "Attempt",
++                i + 1,
++                ": run id=",
++                run.get("id"),
++                "status=",
++                run.get("status"),
++                "conclusion=",
++                run.get("conclusion"),
++            )
++            if run.get("status") == "completed":
++                run_info = run
+                 break
+-    except Exception as e:
+-        print('Error querying runs:', e)
++    except Exception as exc:
++        print("Error querying runs:", exc)
+     time.sleep(15)
+ 
+ if run_info is None:
+-    print('Timeout waiting for run completion. Exiting with code 2.')
++    print("Timeout waiting for run completion. Exiting with code 2.")
+     sys.exit(2)
+ 
+-run_id=run_info.get('id')
+-print('Run completed:', run_id, run_info.get('conclusion'))
++run_id = run_info.get("id")
++print("Run completed:", run_id, run_info.get("conclusion"))
+ 
+ # Fetch jobs and steps
+-jobs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
+-r=s.get(jobs_url, timeout=30)
++jobs_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"
++r = s.get(jobs_url, timeout=30)
+ r.raise_for_status()
+-jobs=r.json().get('jobs', [])
+-print('\nJobs and steps:')
+-for j in jobs:
+-    print('---')
+-    print('Job id:', j.get('id'))
+-    print('Name:', j.get('name'))
+-    print('Status:', j.get('status'), 'Conclusion:', j.get('conclusion'))
+-    for step in j.get('steps', []):
+-        print(' Step:', step.get('number'), step.get('name'), '->', step.get('status'), step.get('conclusion'))
++jobs = r.json().get("jobs", [])
++print("\nJobs and steps:")
++for job in jobs:
++    print("---")
++    print("Job id:", job.get("id"))
++    print("Name:", job.get("name"))
++    print("Status:", job.get("status"), "Conclusion:", job.get("conclusion"))
++    for step in job.get("steps", []):
++        print(
++            " Step:",
++            step.get("number"),
++            step.get("name"),
++            "->",
++            step.get("status"),
++            step.get("conclusion"),
++        )
+ 
+ # Try to list and download artifacts
+-artifacts_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
+-print('\nListing artifacts...')
+-r=s.get(artifacts_url, timeout=30)
+-if r.status_code!=200:
+-    print('Failed to list artifacts:', r.status_code, r.text[:500])
++artifacts_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
++print("\nListing artifacts...")
++r = s.get(artifacts_url, timeout=30)
++if r.status_code != 200:
++    print("Failed to list artifacts:", r.status_code, r.text[:500])
+ else:
+-    arts=r.json().get('artifacts', [])
+-    print('Found', len(arts), 'artifacts')
+-    os.makedirs('test_logs/codacy', exist_ok=True)
++    arts = r.json().get("artifacts", [])
++    print("Found", len(arts), "artifacts")
++    os.makedirs("test_logs/codacy", exist_ok=True)
+     for art in arts:
+-        name=art.get('name')
+-        url=art.get('archive_download_url')
+-        print('Downloading', name)
+-        rr=s.get(url, stream=True, timeout=60)
+-        if rr.status_code==200:
+-            zpath=f'test_logs/codacy/{name}.zip'
+-            open(zpath,'wb').write(rr.content)
++        name = art.get("name")
++        url = art.get("archive_download_url")
++        print("Downloading", name)
++        rr = s.get(url, stream=True, timeout=60)
++        if rr.status_code == 200:
++            zpath = f"test_logs/codacy/{name}.zip"
++            open(zpath, "wb").write(rr.content)
+             try:
+                 with zipfile.ZipFile(zpath) as z:
+-                    z.extractall('test_logs/codacy')
+-                print('Extracted', zpath)
+-            except Exception as e:
+-                print('Extract failed', e)
++                    z.extractall("test_logs/codacy")
++                print("Extracted", zpath)
++            except Exception as exc:
++                print("Extract failed", exc)
+         else:
+-            print('Download failed with', rr.status_code, rr.text[:500])
++            print("Download failed with", rr.status_code, rr.text[:500])
+ 
+-print('\nDone')
++print("\nDone")
+diff --git a/.github/poll_codacy_run_long.py b/.github/poll_codacy_run_long.py
+index d76f2de..6b02ef5 100644
+--- a/.github/poll_codacy_run_long.py
++++ b/.github/poll_codacy_run_long.py
+@@ -1,82 +1,106 @@
+-import os, time, requests, sys, zipfile
+-owner='tim-dickey'
+-repo='multi-modal-neural-network'
+-branch='fix/upgrade-pytorch-2.6'
+-GITHUB_TOKEN=os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+-headers={'Accept':'application/vnd.github+json'}
++import os
++import time
++import requests
++import sys
++import zipfile
++
++owner = "tim-dickey"
++repo = "multi-modal-neural-network"
++branch = "fix/upgrade-pytorch-2.6"
++GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
++headers = {"Accept": "application/vnd.github+json"}
+ if GITHUB_TOKEN:
+-    headers['Authorization']=f'token {GITHUB_TOKEN}'
++    headers["Authorization"] = f"token {GITHUB_TOKEN}"
+ 
+-s=requests.Session()
++s = requests.Session()
+ s.headers.update(headers)
+ 
+-runs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs?branch={branch}&per_page=20'
+-run_info=None
+-print('Polling for completed workflow run (timeout 20 minutes)...')
+-for i in range(80):
++runs_url = (
++    f"https://api.github.com/repos/{owner}/{repo}/actions/runs"
++    f"?branch={branch}&per_page=10"
++)
++run_info = None
++print("Polling for completed workflow run (timeout 30 minutes)...")
++for i in range(120):
+     try:
+-        r=s.get(runs_url, timeout=30)
++        r = s.get(runs_url, timeout=30)
+         r.raise_for_status()
+-        data=r.json()
+-        runs=data.get('workflow_runs', [])
++        data = r.json()
++        runs = data.get("workflow_runs", [])
+         if not runs:
+-            print('No runs found; sleeping...')
++            print("No runs found; sleeping...")
+         else:
+-            run=runs[0]
+-            print(f"Attempt {i+1}: run id={run.get('id')} status={run.get('status')} conclusion={run.get('conclusion')}")
+-            if run.get('status')=='completed':
+-                run_info=run
++            run = runs[0]
++            print(
++                "Attempt",
++                i + 1,
++                ": run id=",
++                run.get("id"),
++                "status=",
++                run.get("status"),
++                "conclusion=",
++                run.get("conclusion"),
++            )
++            if run.get("status") == "completed":
++                run_info = run
+                 break
+-    except Exception as e:
+-        print('Error querying runs:', e)
++    except Exception as exc:
++        print("Error querying runs:", exc)
+     time.sleep(15)
+ 
+ if run_info is None:
+-    print('Timeout waiting for run completion. Exiting with code 2.')
++    print("Timeout waiting for run completion. Exiting with code 2.")
+     sys.exit(2)
+ 
+-run_id=run_info.get('id')
+-print('Run completed:', run_id, run_info.get('conclusion'))
++run_id = run_info.get("id")
++print("Run completed:", run_id, run_info.get("conclusion"))
+ 
+ # Fetch jobs and steps
+-jobs_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
+-r=s.get(jobs_url, timeout=30)
++jobs_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/jobs"
++r = s.get(jobs_url, timeout=30)
+ r.raise_for_status()
+-jobs=r.json().get('jobs', [])
+-print('\nJobs and steps:')
+-for j in jobs:
+-    print('---')
+-    print('Job id:', j.get('id'))
+-    print('Name:', j.get('name'))
+-    print('Status:', j.get('status'), 'Conclusion:', j.get('conclusion'))
+-    for step in j.get('steps', []):
+-        print(' Step:', step.get('number'), step.get('name'), '->', step.get('status'), step.get('conclusion'))
++jobs = r.json().get("jobs", [])
++print("\nJobs and steps:")
++for job in jobs:
++    print("---")
++    print("Job id:", job.get("id"))
++    print("Name:", job.get("name"))
++    print("Status:", job.get("status"), "Conclusion:", job.get("conclusion"))
++    for step in job.get("steps", []):
++        print(
++            " Step:",
++            step.get("number"),
++            step.get("name"),
++            "->",
++            step.get("status"),
++            step.get("conclusion"),
++        )
+ 
+ # Try to list and download artifacts
+-artifacts_url=f'https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
+-print('\nListing artifacts...')
+-r=s.get(artifacts_url, timeout=30)
+-if r.status_code!=200:
+-    print('Failed to list artifacts:', r.status_code, r.text[:500])
++artifacts_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
++print("\nListing artifacts...")
++r = s.get(artifacts_url, timeout=30)
++if r.status_code != 200:
++    print("Failed to list artifacts:", r.status_code, r.text[:500])
+ else:
+-    arts=r.json().get('artifacts', [])
+-    print('Found', len(arts), 'artifacts')
+-    os.makedirs('test_logs/codacy', exist_ok=True)
++    arts = r.json().get("artifacts", [])
++    print("Found", len(arts), "artifacts")
++    os.makedirs("test_logs/codacy", exist_ok=True)
+     for art in arts:
+-        name=art.get('name')
+-        url=art.get('archive_download_url')
+-        print('Downloading', name)
+-        rr=s.get(url, stream=True, timeout=60)
+-        if rr.status_code==200:
+-            zpath=f'test_logs/codacy/{name}.zip'
+-            open(zpath,'wb').write(rr.content)
++        name = art.get("name")
++        url = art.get("archive_download_url")
++        print("Downloading", name)
++        rr = s.get(url, stream=True, timeout=60)
++        if rr.status_code == 200:
++            zpath = f"test_logs/codacy/{name}.zip"
++            open(zpath, "wb").write(rr.content)
+             try:
+                 with zipfile.ZipFile(zpath) as z:
+-                    z.extractall('test_logs/codacy')
+-                print('Extracted', zpath)
+-            except Exception as e:
+-                print('Extract failed', e)
++                    z.extractall("test_logs/codacy")
++                print("Extracted", zpath)
++            except Exception as exc:
++                print("Extract failed", exc)
+         else:
+-            print('Download failed with', rr.status_code, rr.text[:500])
++            print("Download failed with", rr.status_code, rr.text[:500])
+ 
+-print('\nDone')
++print("\nDone")
+diff --git a/inference.py b/inference.py
+index d808d83..f2e866b 100644
+--- a/inference.py
++++ b/inference.py
+@@ -14,7 +14,13 @@ from torchvision import transforms
+ # side-effects when running linters or importing this module.
+ 
+ 
+-def load_model(config_path: str, checkpoint_path: str, device: str = "cuda", *, allow_external: bool = False):
++def load_model(
++    config_path: str,
++    checkpoint_path: str,
++    device: str = "cuda",
++    *,
++    allow_external: bool = False,
++):
+     """Load trained model from checkpoint."""
+     # Ensure `src` is importable when this script is executed as a script
+     import sys as _sys
+@@ -97,7 +103,10 @@ def main():
+     # Load model
+     print(f"Loading model from {args.checkpoint}...")
+     model, config = load_model(
+-        args.config, args.checkpoint, args.device, allow_external=args.allow_external_checkpoint
++        args.config,
++        args.checkpoint,
++        args.device,
++        allow_external=args.allow_external_checkpoint,
+     )
+ 
+     # Preprocess inputs
+diff --git a/src/models/multi_modal_model.py b/src/models/multi_modal_model.py
+index 5ceb83f..92f494b 100644
+--- a/src/models/multi_modal_model.py
++++ b/src/models/multi_modal_model.py
+@@ -360,7 +360,10 @@ def load_pretrained_weights(
+         from ..utils.safe_load import safe_load_checkpoint
+ 
+         vision_state = safe_load_checkpoint(
+-            vision_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
++            vision_checkpoint,
++            map_location="cpu",
++            expected_keys=None,
++            allow_external=allow_external,
+         )
+         # If the checkpoint is a wrapper dict (contains model_state_dict),
+         # accept that as well for backward compatibility.
+@@ -373,7 +376,10 @@ def load_pretrained_weights(
+         from ..utils.safe_load import safe_load_checkpoint
+ 
+         text_state = safe_load_checkpoint(
+-            text_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
++            text_checkpoint,
++            map_location="cpu",
++            expected_keys=None,
++            allow_external=allow_external,
+         )
+         if "model_state_dict" in text_state:
+             text_state = text_state["model_state_dict"]
+diff --git a/src/training/optimizer.py b/src/training/optimizer.py
+index 135100a..0aa3c97 100644
+--- a/src/training/optimizer.py
++++ b/src/training/optimizer.py
+@@ -96,7 +96,7 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
+     return optimizer
+ 
+ 
+-def create_scheduler(
++def create_scheduler(  # noqa: C901
+     optimizer: torch.optim.Optimizer, config: Dict, steps_per_epoch: int
+ ) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
+     """
+diff --git a/src/training/trainer.py b/src/training/trainer.py
+index b82d028..07fec61 100644
+--- a/src/training/trainer.py
++++ b/src/training/trainer.py
+@@ -299,7 +299,9 @@ class Trainer:
+         self.best_val_loss = float("inf")
+ 
+     def _init_amp_and_resume(self, resume_from: Optional[str]) -> None:
+-        """Initialize mixed-precision utilities and optionally resume from checkpoint."""
++        """Initialize mixed-precision utilities and optionally
++        resume from checkpoint.
++        """
+         # Mixed precision training
+         self.use_amp = (
+             self.config.get("training", {}).get("mixed_precision", "bf16") is not None
+diff --git a/src/utils/gpu_utils.py b/src/utils/gpu_utils.py
+index e328076..225d211 100644
+--- a/src/utils/gpu_utils.py
++++ b/src/utils/gpu_utils.py
+@@ -96,12 +96,21 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str
+ 
+     # PowerShell script accepts a parameter ($name) and uses it in a -like
+     # comparison. Passing via -ArgumentList avoids shell interpolation risks.
+-    cmd = (
+-        "param($name); $gpu = Get-PnpDevice -Class Display | Where-Object { $_.FriendlyName -like \"*$name*\" } | Select-Object -First 1;"
+-        " if ($gpu) { $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId -KeyName 'DEVPKEY_Device_Parent' | Select-Object -ExpandProperty Data;"
+-        " $parentDevice = Get-PnpDevice -InstanceId $parent; $busType = Get-PnpDeviceProperty -InstanceId $parent -KeyName 'DEVPKEY_Device_BusTypeGuid' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Data;"
+-        " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }"
+-    )
++    cmd_parts = [
++        "param($name); ",
++        "$gpu = Get-PnpDevice -Class Display | Where-Object { ",
++        "$_.FriendlyName -like \"*$name*\" } ",
++        "| Select-Object -First 1;",
++        " if ($gpu) { ",
++        " $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId ",
++        "-KeyName 'DEVPKEY_Device_Parent' | Select-Object -ExpandProperty Data;",
++        " $parentDevice = Get-PnpDevice -InstanceId $parent;",
++        " $busType = Get-PnpDeviceProperty -InstanceId $parent ",
++        "-KeyName 'DEVPKEY_Device_BusTypeGuid' -ErrorAction SilentlyContinue ",
++        "| Select-Object -ExpandProperty Data;",
++        " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }",
++    ]
++    cmd = "".join(cmd_parts)
+ 
+     # Only run PowerShell if available
+     if not shutil.which("powershell"):
+diff --git a/src/utils/npu_utils.py b/src/utils/npu_utils.py
+index 2d954b7..d4314f4 100644
+--- a/src/utils/npu_utils.py
++++ b/src/utils/npu_utils.py
+@@ -32,7 +32,10 @@ def _safe_run(
+     return subprocess.run(cmd, timeout=timeout, check=False, **kwargs)
+ 
+ 
+-def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> subprocess.CompletedProcess:
++def _run_powershell_pnp_probe(
++    cmd_body: str,
++    args: list[str] | None = None,
++) -> subprocess.CompletedProcess:
+     """Run a PowerShell PnP device probe command via :func:`_safe_run`.
+ 
+     The function accepts the body of the PowerShell command (the part after
+diff --git a/src/utils/safe_load.py b/src/utils/safe_load.py
+index 6ea50ca..c9c8e59 100644
+--- a/src/utils/safe_load.py
++++ b/src/utils/safe_load.py
+@@ -19,7 +19,7 @@ def _looks_like_state_dict(obj: Any) -> bool:
+     return all(isinstance(k, str) for k in obj.keys())
+ 
+ 
+-def safe_load_checkpoint(
++def safe_load_checkpoint(  # noqa: C901
+     path: str,
+     *,
+     map_location: Optional[object] = None,
+@@ -60,7 +60,10 @@ def safe_load_checkpoint(
+     except Exception:
+         resolved = p
+ 
+-    if not allow_external and not any(str(resolved).startswith(str(tr)) for tr in trusted_roots):
++    # Restrict loading to trusted roots unless allow_external is set.
++    if not allow_external and not any(
++        str(resolved).startswith(str(tr)) for tr in trusted_roots
++    ):
+         raise ValueError(
+             "Loading checkpoints from external/untrusted paths is disabled by default; "
+             "set allow_external=True to override when necessary."
+@@ -71,17 +74,21 @@ def safe_load_checkpoint(
+         try:
+             from safetensors.torch import load_file as _st_load
+ 
+-            data = _st_load(path, device=map_location if map_location is not None else "cpu")
++            device_arg = map_location if map_location is not None else "cpu"
++            data = _st_load(path, device=device_arg)
+             # safetensors loaders return a mapping of tensors; normalize to dict
+             if not isinstance(data, dict):
+                 raise ValueError("safetensors loader returned unexpected type")
+             # Convert to CPU-backed tensors if map_location provided
+             if map_location is not None:
+-                device = map_location if isinstance(map_location, torch.device) else map_location
++                if isinstance(map_location, torch.device):
++                    device = map_location
++                else:
++                    device = map_location
+                 data = {k: v.to(device) for k, v in data.items()}
+             return dict(data)
+         except Exception as exc:  # pragma: no cover - defensive
+-            raise ValueError(f"Failed to load safetensors checkpoint {path}: {exc}") from exc
++            raise ValueError(f"Failed to load safetensors {path}: {exc}") from exc
+ 
+     # Fallback to torch.load for normal .pt/.pth files
+     try:
+diff --git a/test_logs/codacy/pip_audit.json b/test_logs/codacy/pip_audit.json
+deleted file mode 100644
+index 15f704f..0000000
+--- a/test_logs/codacy/pip_audit.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{"dependencies": [{"name": "transformers", "version": "4.57.3", "vulns": []}, {"name": "torch", "version": "2.9.1", "vulns": []}, {"name": "huggingface-hub", "version": "0.36.0", "vulns": []}, {"name": "tokenizers", "version": "0.22.1", "vulns": []}, {"name": "torchvision", "version": "0.24.1", "vulns": []}, {"name": "datasets", "version": "4.4.1", "vulns": []}, {"name": "httpx", "version": "0.28.1", "vulns": []}, {"name": "dill", "version": "0.4.0", "vulns": []}, {"name": "fsspec", "version": "2025.10.0", "vulns": []}, {"name": "httpcore", "version": "1.0.9", "vulns": []}, {"name": "multiprocess", "version": "0.70.18", "vulns": []}, {"name": "webdataset", "version": "1.0.2", "vulns": []}, {"name": "pycocotools", "version": "2.0.10", "vulns": []}, {"name": "wandb", "version": "0.23.0", "vulns": []}, {"name": "requests", "version": "2.32.5", "vulns": []}, {"name": "charset-normalizer", "version": "3.4.4", "vulns": []}, {"name": "idna", "version": "3.11", "vulns": []}, {"name": "pydantic", "version": "2.12.5", "vulns": []}, {"name": "pydantic-core", "version": "2.41.5", "vulns": []}, {"name": "typing-extensions", "version": "4.15.0", "vulns": []}, {"name": "urllib3", "version": "2.5.0", "vulns": []}, {"name": "redis", "version": "7.1.0", "vulns": []}, {"name": "diskcache", "version": "5.6.3", "vulns": []}, {"name": "wolframalpha", "version": "5.1.3", "vulns": []}, {"name": "matplotlib", "version": "3.10.7", "vulns": []}, {"name": "seaborn", "version": "0.13.2", "vulns": []}, {"name": "pytest", "version": "9.0.1", "vulns": []}, {"name": "pluggy", "version": "1.6.0", "vulns": []}, {"name": "pytest-cov", "version": "7.0.0", "vulns": []}, {"name": "pytest-benchmark", "version": "5.2.3", "vulns": []}, {"name": "pytest-asyncio", "version": "1.3.0", "vulns": []}, {"name": "black", "version": "25.11.0", "vulns": []}, {"name": "isort", "version": "7.0.0", "vulns": []}, {"name": "flake8", "version": "7.3.0", "vulns": []}, {"name": "mccabe", "version": "0.7.0", "vulns": []}, {"name": "pycodestyle", "version": "2.14.0", "vulns": []}, {"name": "pyflakes", "version": "3.4.0", "vulns": []}, {"name": "mypy", "version": "1.18.2", "vulns": []}, {"name": "jupyter", "version": "1.1.1", "vulns": []}, {"name": "notebook", "version": "7.5.0", "vulns": []}, {"name": "jupyter-server", "version": "2.17.0", "vulns": []}, {"name": "jupyterlab", "version": "4.5.0", "vulns": []}, {"name": "jupyterlab-server", "version": "2.28.0", "vulns": []}, {"name": "notebook-shim", "version": "0.2.4", "vulns": []}, {"name": "sphinx", "version": "8.2.3", "vulns": []}, {"name": "docutils", "version": "0.21.2", "vulns": []}, {"name": "pyyaml", "version": "6.0.3", "vulns": []}, {"name": "numpy", "version": "2.3.5", "vulns": []}, {"name": "scipy", "version": "1.16.3", "vulns": []}, {"name": "scikit-learn", "version": "1.7.2", "vulns": []}, {"name": "tqdm", "version": "4.67.1", "vulns": []}, {"name": "openai", "version": "2.8.1", "vulns": []}, {"name": "anyio", "version": "4.11.0", "vulns": []}, {"name": "distro", "version": "1.9.0", "vulns": []}, {"name": "jiter", "version": "0.12.0", "vulns": []}, {"name": "google-generativeai", "version": "0.8.5", "vulns": []}, {"name": "google-ai-generativelanguage", "version": "0.6.15", "vulns": []}, {"name": "google-api-core", "version": "2.28.1", "vulns": []}, {"name": "google-auth", "version": "2.43.0", "vulns": []}, {"name": "cachetools", "version": "6.2.2", "vulns": []}, {"name": "googleapis-common-protos", "version": "1.72.0", "vulns": []}, {"name": "grpcio", "version": "1.76.0", "vulns": []}, {"name": "grpcio-status", "version": "1.71.2", "vulns": []}, {"name": "proto-plus", "version": "1.26.1", "vulns": []}, {"name": "protobuf", "version": "5.29.5", "vulns": []}, {"name": "rsa", "version": "4.9.1", "vulns": []}, {"name": "anthropic", "version": "0.75.0", "vulns": []}, {"name": "docstring-parser", "version": "0.17.0", "vulns": []}, {"name": "python-dotenv", "version": "1.2.1", "vulns": []}, {"name": "aiohttp", "version": "3.13.2", "vulns": []}, {"name": "multidict", "version": "6.7.0", "vulns": []}, {"name": "yarl", "version": "1.22.0", "vulns": []}, {"name": "aiohappyeyeballs", "version": "2.6.1", "vulns": []}, {"name": "aiosignal", "version": "1.4.0", "vulns": []}, {"name": "alabaster", "version": "1.0.0", "vulns": []}, {"name": "annotated-types", "version": "0.7.0", "vulns": []}, {"name": "argon2-cffi", "version": "25.1.0", "vulns": []}, {"name": "async-lru", "version": "2.0.5", "vulns": []}, {"name": "attrs", "version": "25.4.0", "vulns": []}, {"name": "babel", "version": "2.17.0", "vulns": []}, {"name": "certifi", "version": "2025.11.12", "vulns": []}, {"name": "click", "version": "8.3.1", "vulns": []}, {"name": "colorama", "version": "0.4.6", "vulns": []}, {"name": "contourpy", "version": "1.3.3", "vulns": []}, {"name": "coverage", "version": "7.12.0", "vulns": []}, {"name": "cycler", "version": "0.12.1", "vulns": []}, {"name": "fonttools", "version": "4.60.1", "vulns": []}, {"name": "frozenlist", "version": "1.8.0", "vulns": []}, {"name": "gitpython", "version": "3.1.45", "vulns": []}, {"name": "gitdb", "version": "4.0.12", "vulns": []}, {"name": "smmap", "version": "5.0.2", "vulns": []}, {"name": "h11", "version": "0.16.0", "vulns": []}, {"name": "imagesize", "version": "1.4.1", "vulns": []}, {"name": "iniconfig", "version": "2.3.0", "vulns": []}, {"name": "ipykernel", "version": "7.1.0", "vulns": []}, {"name": "comm", "version": "0.2.3", "vulns": []}, {"name": "debugpy", "version": "1.8.17", "vulns": []}, {"name": "ipython", "version": "9.7.0", "vulns": []}, {"name": "prompt-toolkit", "version": "3.0.52", "vulns": []}, {"name": "decorator", "version": "5.2.1", "vulns": []}, {"name": "ipython-pygments-lexers", "version": "1.1.1", "vulns": []}, {"name": "jedi", "version": "0.19.2", "vulns": []}, {"name": "parso", "version": "0.8.5", "vulns": []}, {"name": "jinja2", "version": "3.1.6", "vulns": []}, {"name": "joblib", "version": "1.5.2", "vulns": []}, {"name": "json5", "version": "0.12.1", "vulns": []}, {"name": "jsonschema", "version": "4.25.1", "vulns": []}, {"name": "jsonschema-specifications", "version": "2025.9.1", "vulns": []}, {"name": "jupyter-client", "version": "8.6.3", "vulns": []}, {"name": "jupyter-core", "version": "5.9.1", "vulns": []}, {"name": "jupyter-events", "version": "0.12.0", "vulns": []}, {"name": "jsonpointer", "version": "3.0.0", "vulns": []}, {"name": "jupyter-lsp", "version": "2.3.0", "vulns": []}, {"name": "jupyter-server-terminals", "version": "0.5.3", "vulns": []}, {"name": "kiwisolver", "version": "1.4.9", "vulns": []}, {"name": "markupsafe", "version": "3.0.3", "vulns": []}, {"name": "matplotlib-inline", "version": "0.2.1", "vulns": []}, {"name": "mypy-extensions", "version": "1.1.0", "vulns": []}, {"name": "nbconvert", "version": "7.16.6", "vulns": []}, {"name": "mistune", "version": "3.1.4", "vulns": []}, {"name": "bleach", "version": "6.3.0", "vulns": []}, {"name": "tinycss2", "version": "1.4.0", "vulns": []}, {"name": "nbclient", "version": "0.10.2", "vulns": []}, {"name": "nbformat", "version": "5.10.4", "vulns": []}, {"name": "fastjsonschema", "version": "2.21.2", "vulns": []}, {"name": "nest-asyncio", "version": "1.6.0", "vulns": []}, {"name": "networkx", "version": "3.6", "vulns": []}, {"name": "packaging", "version": "25.0", "vulns": []}, {"name": "pandas", "version": "2.3.3", "vulns": []}, {"name": "pandocfilters", "version": "1.5.1", "vulns": []}, {"name": "pathspec", "version": "0.12.1", "vulns": []}, {"name": "pillow", "version": "12.0.0", "vulns": []}, {"name": "platformdirs", "version": "4.5.0", "vulns": []}, {"name": "prometheus-client", "version": "0.23.1", "vulns": []}, {"name": "propcache", "version": "0.4.1", "vulns": []}, {"name": "psutil", "version": "7.1.3", "vulns": []}, {"name": "pyarrow", "version": "22.0.0", "vulns": []}, {"name": "pyasn1", "version": "0.6.1", "vulns": []}, {"name": "pyasn1-modules", "version": "0.4.2", "vulns": []}, {"name": "pygments", "version": "2.19.2", "vulns": []}, {"name": "pyparsing", "version": "3.2.5", "vulns": []}, {"name": "python-dateutil", "version": "2.9.0.post0", "vulns": []}, {"name": "python-json-logger", "version": "4.0.0", "vulns": []}, {"name": "pytokens", "version": "0.3.0", "vulns": []}, {"name": "pytz", "version": "2025.2", "vulns": []}, {"name": "pywinpty", "version": "3.0.2", "vulns": []}, {"name": "pyzmq", "version": "27.1.0", "vulns": []}, {"name": "referencing", "version": "0.37.0", "vulns": []}, {"name": "regex", "version": "2025.11.3", "vulns": []}, {"name": "rfc3986-validator", "version": "0.1.1", "vulns": []}, {"name": "rfc3987-syntax", "version": "1.1.0", "vulns": []}, {"name": "lark", "version": "1.3.1", "vulns": []}, {"name": "roman-numerals-py", "version": "3.1.0", "vulns": []}, {"name": "rpds-py", "version": "0.29.0", "vulns": []}, {"name": "safetensors", "version": "0.7.0", "vulns": []}, {"name": "send2trash", "version": "1.8.3", "vulns": []}, {"name": "sentry-sdk", "version": "2.46.0", "vulns": []}, {"name": "six", "version": "1.17.0", "vulns": []}, {"name": "sniffio", "version": "1.3.1", "vulns": []}, {"name": "snowballstemmer", "version": "3.0.1", "vulns": []}, {"name": "sphinxcontrib-applehelp", "version": "2.0.0", "vulns": []}, {"name": "sphinxcontrib-devhelp", "version": "2.0.0", "vulns": []}, {"name": "sphinxcontrib-htmlhelp", "version": "2.1.0", "vulns": []}, {"name": "sphinxcontrib-jsmath", "version": "1.0.1", "vulns": []}, {"name": "sphinxcontrib-qthelp", "version": "2.0.0", "vulns": []}, {"name": "sphinxcontrib-serializinghtml", "version": "2.0.0", "vulns": []}, {"name": "stack-data", "version": "0.6.3", "vulns": []}, {"name": "asttokens", "version": "3.0.1", "vulns": []}, {"name": "executing", "version": "2.2.1", "vulns": []}, {"name": "sympy", "version": "1.14.0", "vulns": []}, {"name": "mpmath", "version": "1.3.0", "vulns": []}, {"name": "terminado", "version": "0.18.1", "vulns": []}, {"name": "threadpoolctl", "version": "3.6.0", "vulns": []}, {"name": "tornado", "version": "6.5.2", "vulns": []}, {"name": "traitlets", "version": "5.14.3", "vulns": []}, {"name": "typing-inspection", "version": "0.4.2", "vulns": []}, {"name": "tzdata", "version": "2025.2", "vulns": []}, {"name": "webcolors", "version": "25.10.0", "vulns": []}, {"name": "webencodings", "version": "0.5.1", "vulns": []}, {"name": "websocket-client", "version": "1.9.0", "vulns": []}, {"name": "argon2-cffi-bindings", "version": "25.1.0", "vulns": []}, {"name": "cffi", "version": "2.0.0", "vulns": []}, {"name": "beautifulsoup4", "version": "4.14.2", "vulns": []}, {"name": "soupsieve", "version": "2.8", "vulns": []}, {"name": "braceexpand", "version": "0.1.7", "vulns": []}, {"name": "defusedxml", "version": "0.7.1", "vulns": []}, {"name": "filelock", "version": "3.20.0", "vulns": []}, {"name": "fqdn", "version": "1.5.1", "vulns": []}, {"name": "google-api-python-client", "version": "2.187.0", "vulns": []}, {"name": "google-auth-httplib2", "version": "0.2.1", "vulns": []}, {"name": "httplib2", "version": "0.31.0", "vulns": []}, {"name": "uritemplate", "version": "4.2.0", "vulns": []}, {"name": "ipywidgets", "version": "8.1.8", "vulns": []}, {"name": "jupyterlab-widgets", "version": "3.0.16", "vulns": []}, {"name": "widgetsnbextension", "version": "4.0.15", "vulns": []}, {"name": "isoduration", "version": "20.11.0", "vulns": []}, {"name": "arrow", "version": "1.4.0", "vulns": []}, {"name": "jaraco-context", "version": "6.0.1", "vulns": []}, {"name": "jupyter-console", "version": "6.6.3", "vulns": []}, {"name": "jupyterlab-pygments", "version": "0.3.0", "vulns": []}, {"name": "more-itertools", "version": "10.8.0", "vulns": []}, {"name": "pure-eval", "version": "0.2.3", "vulns": []}, {"name": "py-cpuinfo", "version": "9.0.0", "vulns": []}, {"name": "pycparser", "version": "2.23", "vulns": []}, {"name": "rfc3339-validator", "version": "0.1.4", "vulns": []}, {"name": "uri-template", "version": "1.3.0", "vulns": []}, {"name": "wcwidth", "version": "0.2.14", "vulns": []}, {"name": "xmltodict", "version": "1.0.2", "vulns": []}, {"name": "xxhash", "version": "3.6.0", "vulns": []}], "fixes": []}

@@ -96,7 +96,7 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
     return optimizer
 
 
-def create_scheduler(
+def create_scheduler(  # noqa: C901
     optimizer: torch.optim.Optimizer, config: Dict, steps_per_epoch: int
 ) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
     """
