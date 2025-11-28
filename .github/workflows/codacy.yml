@@ -82,7 +82,8 @@ jobs:
 
           echo "--- executing extracted binary directly ---" >> codacy-diag.txt
           # Execute the extracted binary directly; quote the token to avoid shell interpretation
-          "$BIN" analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+          # Use the CLI's --api-token flag (the binary does not accept --project-token)
+          "$BIN" analyze --api-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
 
           # Append diagnostics to the log bundle
           echo "\n--- CONTENTS OF codacy-diag.txt ---" >> codacy-cli.log
