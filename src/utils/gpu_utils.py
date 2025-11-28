@@ -4,6 +4,7 @@ import logging
 import platform
 import shutil
 import subprocess
+import re
 from typing import Any
 
 import torch
@@ -81,30 +82,33 @@ def _detect_external_gpu(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
 
 def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
     """Windows-specific external GPU detection using PowerShell."""
-    # Build the PowerShell command in short concatenated pieces
-    cmd_parts = [
-        "$gpu = Get-PnpDevice -Class Display |",
-        "Where-Object {$_.FriendlyName -like '*" + gpu_name.split()[0] + "*'} |",
-        "Select-Object -First 1;",
-        "if ($gpu) {",
-        "  $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId",
-        "  -KeyName 'DEVPKEY_Device_Parent' |",
-        "  Select-Object -ExpandProperty Data;",
-        "  $parentDevice = Get-PnpDevice -InstanceId $parent;",
-        "  $busType = Get-PnpDeviceProperty -InstanceId $parent",
-        "  -KeyName 'DEVPKEY_Device_BusTypeGuid'",
-        "  -ErrorAction SilentlyContinue |",
-        "  Select-Object -ExpandProperty Data;",
-        '  Write-Output "$($parentDevice.FriendlyName)|$busType";',
-        "}",
-    ]
-    cmd = " ".join(cmd_parts)
+    # Build the PowerShell command as a parameterized script and pass the
+    # GPU name as an argument to avoid embedding untrusted input directly
+    # into the command string. We also sanitize the value to remove any
+    # control or metacharacters as a defence-in-depth measure.
+    safe_fragment = ""
+    try:
+        first_token = gpu_name.split()[0] if gpu_name else ""
+        # Allow alphanumerics, space, underscore and hyphen only
+        safe_fragment = re.sub(r"[^A-Za-z0-9 _-]", "", first_token)
+    except Exception:
+        safe_fragment = ""
+
+    # PowerShell script accepts a parameter ($name) and uses it in a -like
+    # comparison. Passing via -ArgumentList avoids shell interpolation risks.
+    cmd = (
+        "param($name); $gpu = Get-PnpDevice -Class Display | Where-Object { $_.FriendlyName -like \"*$name*\" } | Select-Object -First 1;"
+        " if ($gpu) { $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId -KeyName 'DEVPKEY_Device_Parent' | Select-Object -ExpandProperty Data;"
+        " $parentDevice = Get-PnpDevice -InstanceId $parent; $busType = Get-PnpDeviceProperty -InstanceId $parent -KeyName 'DEVPKEY_Device_BusTypeGuid' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Data;"
+        " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }"
+    )
+
     # Only run PowerShell if available
     if not shutil.which("powershell"):
         return False, None
 
     result = subprocess.run(
-        ["powershell", "-Command", cmd],
+        ["powershell", "-Command", cmd, "-ArgumentList", safe_fragment],
         capture_output=True,
         text=True,
         timeout=5,
