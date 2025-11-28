@@ -39,4 +39,15 @@ jobs:
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
-          bash ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . || true
+          # Capture stdout/stderr to a log file for later inspection
+          bash ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+
+      - name: Upload Codacy CLI output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codacy-cli-output
+          path: |
+            codacy-cli.log
+            .codacy-cli-v2
+            .codacy
