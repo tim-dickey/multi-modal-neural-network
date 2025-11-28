@@ -1,13 +1,13 @@
 """Main multi-modal neural network model with double-loop learning."""
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn
 
 from .double_loop_controller import create_double_loop_controller
 from .fusion_layer import create_fusion_layer
-from .heads import create_task_head, MultiTaskHead
+from .heads import MultiTaskHead, create_task_head
 from .text_encoder import create_text_encoder
 from .vision_encoder import create_vision_encoder
 
@@ -66,6 +66,76 @@ class MultiModalModel(nn.Module):
         # Mean pooling
         return features.mean(dim=1)
 
+    def _encode_modalities(
+        self,
+        images: Optional[torch.Tensor],
+        input_ids: Optional[torch.Tensor],
+        attention_mask: Optional[torch.Tensor],
+        token_type_ids: Optional[torch.Tensor],
+    ) -> tuple:
+        """Encode vision and text modalities and return pooled components.
+
+        Returns: vision_cls, vision_features, text_cls, text_features
+        """
+        if images is not None:
+            vision_cls, vision_features = self.vision_encoder(images)
+        else:
+            raise ValueError("Image input is required")
+
+        if input_ids is not None:
+            text_cls, text_features = self.text_encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+            )
+        else:
+            device = images.device if images is not None else None
+            text_cls = torch.zeros(
+                batch_size := vision_cls.shape[0], self.hidden_dim, device=device
+            )
+            text_features = torch.zeros(batch_size, 1, self.hidden_dim, device=device)
+
+        return vision_cls, vision_features, text_cls, text_features
+
+    def _apply_task_head(
+        self,
+        pooled_features: torch.Tensor,
+        vision_cls: torch.Tensor,
+        text_cls: torch.Tensor,
+        task_name: Optional[str],
+    ) -> Dict[str, Any]:
+        """Apply the configured task head and return outputs dict."""
+        outputs: Dict[str, Any] = {}
+
+        _cls = getattr(self.task_head, "__class__", type(None))
+        cls_name = _cls.__name__
+        is_multi_task = isinstance(self.task_head, MultiTaskHead) or (
+            cls_name == "MultiTaskHead"
+        )
+
+        if is_multi_task:
+            task_kwargs = {"task_name": task_name}
+            task_outputs = self.task_head(pooled_features, **task_kwargs)
+            outputs.update(task_outputs)
+            return outputs
+
+        # Single-task head
+        if hasattr(self.task_head, "forward"):
+            cls_name2 = getattr(self.task_head, "__class__", type(None)).__name__
+            is_contrastive = task_name == "contrastive" or (
+                cls_name2 == "ContrastiveHead"
+            )
+
+            if is_contrastive:
+                logits = self.task_head(vision_cls, text_cls)
+            else:
+                logits = self.task_head(pooled_features)
+        else:
+            logits = pooled_features
+
+        outputs["logits"] = logits
+        return outputs
+
     def forward(
         self,
         images: Optional[torch.Tensor] = None,
@@ -98,38 +168,21 @@ class MultiModalModel(nn.Module):
                 - features: intermediate features (if return_features=True)
                 - meta_info: double-loop controller info (if enabled)
         """
-        batch_size = images.shape[0] if images is not None else input_ids.shape[0]  # type: ignore
         outputs = {}
 
-        # Encode vision
-        if images is not None:
-            vision_cls, vision_features = self.vision_encoder(images)
-        else:
-            raise ValueError("Image input is required")
+        # Encode modalities (vision + text) and fuse to pooled features
+        vision_cls, vision_features, text_cls, text_features = self._encode_modalities(
+            images, input_ids, attention_mask, token_type_ids
+        )
 
-        # Encode text
-        if input_ids is not None:
-            text_cls, text_features = self.text_encoder(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                token_type_ids=token_type_ids,
-            )
-        else:
-            # Use dummy text if not provided
-            device = images.device if images is not None else None
-            text_cls = torch.zeros(batch_size, self.hidden_dim, device=device)
-            text_features = torch.zeros(batch_size, 1, self.hidden_dim, device=device)
-
-        # Fusion
         if self.fusion_type == "early":
             fused_features, vision_seq_len = self.fusion_layer(
                 vision_features=vision_features,
                 text_features=text_features,
                 text_mask=attention_mask,
             )
-            # Pool fused features
             pooled_features = self._aggregate_features(fused_features)
-        else:  # late fusion
+        else:
             pooled_features, _ = self.fusion_layer(
                 vision_features=vision_features,
                 text_features=text_features,
@@ -155,19 +208,27 @@ class MultiModalModel(nn.Module):
                 outputs["meta_info"] = None
 
         # Task prediction
-        if isinstance(self.task_head, MultiTaskHead) or (
-            hasattr(self.task_head, "__class__") and self.task_head.__class__.__name__ == "MultiTaskHead"
-        ):
+        # Short helper flags to keep lines under length limits
+        _cls = getattr(self.task_head, "__class__", type(None))
+        cls_name = _cls.__name__
+        is_multi_task = isinstance(self.task_head, MultiTaskHead) or (
+            cls_name == "MultiTaskHead"
+        )
+
+        if is_multi_task:
             # Return a dict of task outputs
-            task_outputs = self.task_head(pooled_features, task_name=task_name)
+            task_kwargs = {"task_name": task_name}
+            task_outputs = self.task_head(pooled_features, **task_kwargs)
             outputs.update(task_outputs)
         else:
             if hasattr(self.task_head, "forward"):
                 # Check if it's a contrastive head that needs both modalities
-                if task_name == "contrastive" or (
-                    hasattr(self.task_head, "__class__")
-                    and self.task_head.__class__.__name__ == "ContrastiveHead"
-                ):
+                cls_name = getattr(self.task_head, "__class__", type(None)).__name__
+                is_contrastive = task_name == "contrastive" or (
+                    cls_name == "ContrastiveHead"
+                )
+
+                if is_contrastive:
                     logits = self.task_head(vision_cls, text_cls)
                 else:
                     logits = self.task_head(pooled_features)
@@ -253,7 +314,9 @@ def create_multi_modal_model(config: Dict) -> MultiModalModel:
     if alias_head_type is not None:
         # Normalize alias values (tests may use 'multi_task')
         normalized = alias_head_type.replace("_", "")
-        head_config["type"] = "multitask" if normalized == "multitask" else alias_head_type
+        head_config["type"] = (
+            "multitask" if normalized == "multitask" else alias_head_type
+        )
     alias_tasks = model_config.get("task_configs")
     if alias_tasks is not None:
         head_config["tasks"] = alias_tasks

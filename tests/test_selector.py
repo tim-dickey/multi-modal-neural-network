@@ -1,8 +1,9 @@
 """Tests for dataset selector build_dataloaders."""
 
-import random
 import json
+import random
 from pathlib import Path
+
 import pytest
 
 from src.data.selector import build_dataloaders
@@ -15,13 +16,11 @@ def _create_multimodal_dir(base: Path, name: str, count: int = 10):
     images_dir = ds_dir / "images"
     images_dir.mkdir()
     annotations = []
-    from PIL import Image
     import numpy as np
+    from PIL import Image
 
     for i in range(count):
-        img = Image.fromarray(
-            np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
-        )
+        img = Image.fromarray(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
         img_path = images_dir / f"image_{i}.jpg"
         img.save(img_path)
         annotations.append(
@@ -63,7 +62,7 @@ class TestBuildDataLoaders:
                         "type": "multimodal",
                         "data_path": str(ds2),
                         "splits": {"train": 1.0},
-                        "use_in": ["train"],  # Only contribute to train
+                        "use_in": ["train"],
                         "enabled": True,
                     },
                 ],
@@ -72,7 +71,8 @@ class TestBuildDataLoaders:
 
         train_loader, val_loader, test_loader = build_dataloaders(config)
 
-        # ds1 splits (10 items): train=6, val=2, test=2. ds2 contributes 5 to train only.
+        # ds1 splits (10 items): train=6, val=2, test=2.
+        # ds2 contributes 5 to train only.
         assert len(train_loader.dataset) == 11  # 6 + 5
         assert val_loader is not None and len(val_loader.dataset) == 2
         assert test_loader is not None and len(test_loader.dataset) == 2

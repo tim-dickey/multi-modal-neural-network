@@ -4,22 +4,23 @@ Provides `build_dataloaders` to construct train/val/test loaders from
 `config['data']['datasets']` entries. Each dataset entry supports:
 - name: identifier
 - type: one of multimodal, coco_captions, imagenet
-- splits: mapping of split name to ratio (must sum to 1.0) (optional, defaults to train:1.0)
+- splits: mapping of split name to ratio (must sum to 1.0)
+    (optional, defaults to train:1.0)
 - use_in: restrict which splits this dataset contributes to (optional)
 - remaining keys are forwarded to the underlying dataset class constructor
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
 import random
+from typing import Any, Dict, List, Optional, Tuple
 
-import torch
-from torch.utils.data import DataLoader, Dataset, Subset, ConcatDataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 
 from .dataset import (
-    MultiModalDataset,
     COCOCaptionsDataset,
     ImageNetDataset,
+    MultiModalDataset,
 )
 
 _DATASET_TYPES: Dict[str, Any] = {
@@ -58,7 +59,55 @@ def _split_indices(n: int, splits: Dict[str, float]) -> Dict[str, List[int]]:
     return out
 
 
-def build_dataloaders(config: Dict[str, Any]) -> Tuple[DataLoader, Optional[DataLoader], Optional[DataLoader]]:
+def _assemble_buckets(
+    ds_cfgs: List[Dict[str, Any]], buckets: Dict[str, List[Dataset]]
+) -> None:
+    """Populate `buckets` (train/val/test) from dataset configs.
+
+    This helper isolates the dataset instantiation and split logic so that
+    `build_dataloaders` stays small and easier to test.
+    """
+    for entry in ds_cfgs:
+        if entry.get("enabled", True) is False:
+            continue
+        ds = _instantiate(entry)
+        splits = entry.get("splits", {"train": 1.0})
+        indices_map = _split_indices(len(ds), splits)
+        use_in = entry.get("use_in")
+        for split_name, split_indices in indices_map.items():
+            if split_name not in buckets:
+                continue
+            if use_in and split_name not in use_in:
+                continue
+            if not split_indices:
+                continue
+            buckets[split_name].append(Subset(ds, split_indices))
+
+
+def _merge(parts: List[Dataset]) -> Optional[Dataset]:
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return ConcatDataset(parts)
+
+
+def _make_loader(
+    ds: Dataset, batch_size: int, shuffle: bool, num_workers: int, pin_memory: bool
+) -> DataLoader:
+    return DataLoader(
+        ds,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        drop_last=False,
+    )
+
+
+def build_dataloaders(
+    config: Dict[str, Any],
+) -> Tuple[DataLoader, Optional[DataLoader], Optional[DataLoader]]:
     """Build train/val/test DataLoaders from config.
 
     Expected structure:
@@ -94,22 +143,7 @@ def build_dataloaders(config: Dict[str, Any]) -> Tuple[DataLoader, Optional[Data
     shuffle_train = bool(data_cfg.get("shuffle_train", True))
 
     buckets: Dict[str, List[Dataset]] = {"train": [], "val": [], "test": []}
-
-    for entry in ds_cfgs:
-        if entry.get("enabled", True) is False:
-            continue
-        ds = _instantiate(entry)
-        splits = entry.get("splits", {"train": 1.0})
-        indices_map = _split_indices(len(ds), splits)
-        use_in = entry.get("use_in")
-        for split_name, split_indices in indices_map.items():
-            if split_name not in buckets:
-                continue
-            if use_in and split_name not in use_in:
-                continue
-            if not split_indices:
-                continue
-            buckets[split_name].append(Subset(ds, split_indices))
+    _assemble_buckets(ds_cfgs, buckets)
 
     def _merge(parts: List[Dataset]) -> Optional[Dataset]:
         if not parts:
@@ -139,5 +173,6 @@ def build_dataloaders(config: Dict[str, Any]) -> Tuple[DataLoader, Optional[Data
     val_loader = _make_loader(val_ds, False) if val_ds else None
     test_loader = _make_loader(test_ds, False) if test_ds else None
     return train_loader, val_loader, test_loader
+
 
 __all__ = ["build_dataloaders"]

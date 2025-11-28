@@ -1,10 +1,10 @@
 """Base classes and utilities for API integrations."""
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Callable, cast
 import logging
 import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class APIResponse:
     """Standardized API response structure."""
+
     success: bool
     data: Any
     error: Optional[str] = None
@@ -32,10 +33,10 @@ class APIIntegration(ABC):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Common config defaults
-        self.timeout = config.get('timeout', 30)
-        self.max_retries = config.get('max_retries', 3)
-        self.retry_delay = config.get('retry_delay', 1.0)
-        self.cache_dir = config.get('cache_dir', './cache')
+        self.timeout = config.get("timeout", 30)
+        self.max_retries = config.get("max_retries", 3)
+        self.retry_delay = config.get("retry_delay", 1.0)
+        self.cache_dir = config.get("cache_dir", "./cache")
 
     @abstractmethod
     def query(self, prompt: str, **kwargs: Any) -> APIResponse:
@@ -62,7 +63,9 @@ class APIIntegration(ABC):
         """
         raise NotImplementedError
 
-    def _make_request_with_retry(self, request_func: Callable[..., APIResponse], *args: Any, **kwargs: Any) -> APIResponse:
+    def _make_request_with_retry(
+        self, request_func: Callable[..., APIResponse], *args: Any, **kwargs: Any
+    ) -> APIResponse:
         """Make a request with automatic retry logic.
 
         Args:
@@ -83,12 +86,12 @@ class APIIntegration(ABC):
                 self.logger.warning("Request attempt %d failed: %s", attempt + 1, e)
 
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (2 ** attempt))  # Exponential backoff
+                    time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
 
         return APIResponse(
             success=False,
             data=None,
-            error=f"Request failed after {self.max_retries} attempts: {last_error}"
+            error=f"Request failed after {self.max_retries} attempts: {last_error}",
         )
 
 
@@ -100,8 +103,8 @@ class KnowledgeInjector:
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.injection_weight = config.get('injection_weight', 0.1)
-        self.validation_threshold = cast(float, config.get('validation_threshold', 0.8))
+        self.injection_weight = config.get("injection_weight", 0.1)
+        self.validation_threshold = cast(float, config.get("validation_threshold", 0.8))
 
     @abstractmethod
     def inject_knowledge(self, input_data: Any, model_output: Any) -> Dict[str, Any]:

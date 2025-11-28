@@ -1,13 +1,15 @@
 """Mocking utilities for testing external API integrations."""
 
-from unittest.mock import Mock, MagicMock, patch
-from typing import Any, Dict, Optional, Callable
 import json
+from typing import Any, Callable, Dict, Optional
+from unittest.mock import Mock, patch
+
 import pytest
 
 # Optional imports for HTTP mocking
 try:
     import responses  # pylint: disable=import-error
+
     HAS_RESPONSES = True
 except ImportError:
     HAS_RESPONSES = False
@@ -15,6 +17,7 @@ except ImportError:
 
 try:
     import httpx  # pylint: disable=import-error
+
     HAS_HTTPX = True
 except ImportError:
     HAS_HTTPX = False
@@ -22,6 +25,7 @@ except ImportError:
 
 try:
     from aiohttp import web  # pylint: disable=import-error
+
     HAS_AIOHTTP = True
 except ImportError:
     HAS_AIOHTTP = False
@@ -44,22 +48,24 @@ class MockAPIClient:
         response.raise_for_status.return_value = None
         return response
 
-    def mock_error_response(self, error_message: str = "API Error", status_code: int = 400) -> Mock:
+    def mock_error_response(
+        self, error_message: str = "API Error", status_code: int = 400
+    ) -> Mock:
         """Create a mock error response."""
         response = Mock()
         response.status_code = status_code
         response.json.side_effect = ValueError("Invalid JSON")
         response.text = error_message
-        response.raise_for_status.side_effect = Exception(f"HTTP {status_code}: {error_message}")
+        response.raise_for_status.side_effect = Exception(
+            f"HTTP {status_code}: {error_message}"
+        )
         return response
 
     def record_call(self, method: str, endpoint: str, **kwargs):
         """Record an API call for verification."""
-        self.call_history.append({
-            "method": method,
-            "endpoint": endpoint,
-            "kwargs": kwargs
-        })
+        self.call_history.append(
+            {"method": method, "endpoint": endpoint, "kwargs": kwargs}
+        )
 
 
 class MockWolframClient(MockAPIClient):
@@ -102,7 +108,9 @@ class MockWolframClient(MockAPIClient):
     def query(self, query: str) -> Mock:
         """Mock query method."""
         self.record_call("GET", "/v2/query", query=query)
-        return self.mock_responses.get(query, self._create_wolfram_result("Mock result"))
+        return self.mock_responses.get(
+            query, self._create_wolfram_result("Mock result")
+        )
 
 
 class MockOpenAIClient(MockAPIClient):
@@ -127,8 +135,7 @@ class MockOpenAIClient(MockAPIClient):
         response = Mock()
         response.choices = [Mock()]
         response.choices[0].text = self.mock_responses.get(
-            "simple" if "simple" in prompt else "math",
-            "Mock completion response"
+            "simple" if "simple" in prompt else "math", "Mock completion response"
         )
         return response
 
@@ -151,8 +158,7 @@ class MockOpenAIClient(MockAPIClient):
         response.choices = [Mock()]
         mock_message = Mock()
         mock_message.content = self.mock_responses.get(
-            "simple" if "simple" in user_message else "math",
-            "Mock chat response"
+            "simple" if "simple" in user_message else "math", "Mock chat response"
         )
         response.choices[0].message = mock_message
         return response
@@ -179,8 +185,7 @@ class MockGoogleAIClient(MockAPIClient):
         response = Mock()
         response.candidates = [Mock()]
         response.candidates[0].output = self.mock_responses.get(
-            "generate" if "generate" in prompt else "math",
-            "Mock PaLM response"
+            "generate" if "generate" in prompt else "math", "Mock PaLM response"
         )
         return response
 
@@ -214,7 +219,7 @@ class MockAnthropicClient(MockAPIClient):
         response.content = [Mock()]
         response.content[0].text = self.mock_responses.get(
             "simple" if "simple" in human_message else "reasoning",
-            "Mock Claude response"
+            "Mock Claude response",
         )
         return response
 
@@ -228,7 +233,7 @@ class mock_wolfram_alpha:
         self.mock_client = MockWolframClient()
 
     def __enter__(self):
-        self.patcher = patch('wolframalpha.Client')
+        self.patcher = patch("wolframalpha.Client")
         mock_class = self.patcher.start()
         mock_class.return_value = self.mock_client
         return self.mock_client
@@ -245,7 +250,7 @@ class mock_openai:
         self.mock_client = MockOpenAIClient()
 
     def __enter__(self):
-        self.patcher = patch('openai.OpenAI')
+        self.patcher = patch("openai.OpenAI")
         mock_class = self.patcher.start()
         mock_class.return_value = self.mock_client
         return self.mock_client
@@ -262,7 +267,7 @@ class mock_google_ai:
         self.mock_client = MockGoogleAIClient()
 
     def __enter__(self):
-        self.patcher = patch('google.generativeai.GenerativeModel')
+        self.patcher = patch("google.generativeai.GenerativeModel")
         mock_class = self.patcher.start()
         mock_class.return_value = self.mock_client
         return self.mock_client
@@ -279,7 +284,7 @@ class mock_anthropic:
         self.mock_client = MockAnthropicClient()
 
     def __enter__(self):
-        self.patcher = patch('anthropic.Anthropic')
+        self.patcher = patch("anthropic.Anthropic")
         mock_class = self.patcher.start()
         mock_class.return_value = self.mock_client
         return self.mock_client
@@ -306,7 +311,7 @@ class MockHTTPServer:
             raise ImportError("aiohttp is required for MockHTTPServer")
         self.runner = web.AppRunner(self.app)  # type: ignore
         await self.runner.setup()
-        self.site = web.TCPSite(self.runner, 'localhost', self.port)  # type: ignore
+        self.site = web.TCPSite(self.runner, "localhost", self.port)  # type: ignore
         await self.site.start()
 
     async def stop_server(self):
@@ -372,14 +377,13 @@ def mock_anthropic_client():
 
 
 # Utility functions for test data
-def create_mock_api_response(success: bool = True, data: Any = None, error: Optional[str] = None):
+def create_mock_api_response(
+    success: bool = True, data: Any = None, error: Optional[str] = None
+):
     """Create a mock API response."""
     from src.integrations.base import APIResponse
-    return APIResponse(
-        success=success,
-        data=data,
-        error=error
-    )
+
+    return APIResponse(success=success, data=data, error=error)
 
 
 def create_mock_wolfram_pod(title: str, result: str) -> Mock:

@@ -2,7 +2,17 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast, Protocol, TYPE_CHECKING, Iterable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    cast,
+)
 
 import torch
 from PIL import Image
@@ -10,24 +20,19 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 if TYPE_CHECKING:
-    from pycocotools.coco import COCO as _COCO
+    pass
 
 
 class CocoLike(Protocol):
-    def getCatIds(self) -> Iterable[int]:
-        ...
+    def getCatIds(self) -> Iterable[int]: ...
 
-    def getImgIds(self) -> Iterable[int]:
-        ...
+    def getImgIds(self) -> Iterable[int]: ...
 
-    def loadAnns(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
-        ...
+    def loadAnns(self, ids: Iterable[int]) -> list[Dict[str, Any]]: ...
 
-    def loadCats(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
-        ...
+    def loadCats(self, ids: Iterable[int]) -> list[Dict[str, Any]]: ...
 
-    def loadImgs(self, ids: Iterable[int]) -> list[Dict[str, Any]]:
-        ...
+    def loadImgs(self, ids: Iterable[int]) -> list[Dict[str, Any]]: ...
 
 
 COCOType = "_COCO | CocoLike"
@@ -237,9 +242,6 @@ class COCOCaptionsDataset(MultiModalDataset):
         except (FileNotFoundError, OSError, KeyError, ValueError, ImportError):
             # Expected data/IO/import issues: fallback to parent implementation
             return super()._load_annotations()
-        except Exception:
-            # Unexpected error: don't silently swallow it
-            raise
 
 
 class ImageNetDataset(Dataset):

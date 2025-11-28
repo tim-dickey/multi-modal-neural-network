@@ -1,17 +1,19 @@
 """Logging utilities for training."""
 
+import contextlib
 import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 def setup_logger(
-    name: str = "multi_modal", log_file: Optional[str] = None, level: int = logging.INFO
+    name: str = "multi_modal",
+    log_file: str | None = None,
+    level: int = logging.INFO,
 ) -> logging.Logger:
-    """
-    Setup logger with console and optional file handlers.
+    """Set up logger with console and optional file handlers.
 
     Args:
         name: Logger name
@@ -20,6 +22,7 @@ def setup_logger(
 
     Returns:
         Logger instance
+
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -27,14 +30,10 @@ def setup_logger(
     # Remove existing handlers (close them first to avoid ResourceWarnings)
     if logger.handlers:
         for h in list(logger.handlers):
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 h.flush()
-            except (OSError, ValueError):
-                pass
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 h.close()
-            except (OSError, ValueError):
-                pass
         logger.handlers = []
 
     # Console handler
@@ -67,7 +66,8 @@ def setup_logger(
 class MetricsLogger:
     """Logger for training metrics."""
 
-    def __init__(self, log_dir: str, experiment_name: str):
+    def __init__(self, log_dir: str, experiment_name: str) -> None:
+        """Initialize the metrics logger."""
         self.log_dir = Path(log_dir)
         self.experiment_name = experiment_name
         self.metrics_file = self.log_dir / f"{experiment_name}_metrics.txt"
@@ -75,21 +75,22 @@ class MetricsLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize metrics file
-        with open(self.metrics_file, "w", encoding="utf-8") as f:
+        with self.metrics_file.open("w", encoding="utf-8") as f:
             f.write(f"Experiment: {experiment_name}\n")
-            f.write(f"Started: {datetime.now()}\n")
+            # include timezone info
+            f.write(f"Started: {datetime.now().astimezone().isoformat()}\n")
             f.write("-" * 80 + "\n")
 
-    def log_metrics(self, step: int, metrics: Dict[str, Any], prefix: str = "") -> None:
-        """
-        Log metrics to file.
+    def log_metrics(self, step: int, metrics: dict[str, Any], prefix: str = "") -> None:
+        """Log metrics to file.
 
         Args:
             step: Training step
             metrics: Dictionary of metric names and values
             prefix: Optional prefix for metric names
+
         """
-        with open(self.metrics_file, "a", encoding="utf-8") as f:
+        with self.metrics_file.open("a", encoding="utf-8") as f:
             f.write(f"\nStep {step}:\n")
             for key, value in metrics.items():
                 metric_name = f"{prefix}{key}" if prefix else key
@@ -98,12 +99,17 @@ class MetricsLogger:
                 else:
                     f.write(f"  {metric_name}: {value}\n")
 
-    def log_epoch(self, epoch: int, train_metrics: Dict[str, Any], val_metrics: Optional[Dict[str, Any]] = None) -> None:
+    def log_epoch(
+        self,
+        epoch: int,
+        train_metrics: dict[str, Any],
+        val_metrics: dict[str, Any] | None = None,
+    ) -> None:
         """Log epoch summary."""
-        with open(self.metrics_file, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*80}\n")
+        with self.metrics_file.open("a", encoding="utf-8") as f:
+            f.write(f"\n{'=' * 80}\n")
             f.write(f"Epoch {epoch} Summary:\n")
-            f.write(f"{'='*80}\n")
+            f.write(f"{'=' * 80}\n")
 
             f.write("Train metrics:\n")
             for key, value in train_metrics.items():
@@ -121,8 +127,13 @@ class WandbLogger:
     """Wrapper for Weights & Biases logging."""
 
     def __init__(
-        self, project: str, experiment: str, config: Dict[str, Any], enabled: bool = True
+        self,
+        project: str,
+        experiment: str,
+        config: dict[str, Any],
+        enabled: bool = True,
     ) -> None:
+        """Initialize a lightweight wandb wrapper."""
         self.enabled = enabled
 
         if self.enabled:
@@ -132,18 +143,23 @@ class WandbLogger:
                 self.wandb = wandb
                 self.run = wandb.init(project=project, name=experiment, config=config)
             except ImportError:
-                print("wandb not installed, disabling wandb logging")
+                logging.getLogger(__name__).warning(
+                    "wandb not installed, disabling wandb logging",
+                )
                 self.enabled = False
             except (ValueError, RuntimeError) as e:
-                print(f"Failed to initialize wandb: {e}")
+                logging.getLogger(__name__).warning(
+                    "Failed to initialize wandb: %s",
+                    e,
+                )
                 self.enabled = False
 
-    def log(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
+    def log(self, metrics: dict[str, Any], step: int | None = None) -> None:
         """Log metrics to wandb."""
         if self.enabled:
             self.wandb.log(metrics, step=step)
 
-    def log_image(self, key: str, image: Any, step: Optional[int] = None) -> None:
+    def log_image(self, key: str, image: object, step: int | None = None) -> None:
         """Log image to wandb."""
         if self.enabled:
             self.wandb.log({key: self.wandb.Image(image)}, step=step)
@@ -156,20 +172,20 @@ class WandbLogger:
 
 def log_model_info(logger: logging.Logger, model: Any) -> None:
     """Log model architecture information."""
-    logger.info("=" * 80)
+    logger.info("%s", "=" * 80)
     logger.info("Model Information:")
-    logger.info("=" * 80)
+    logger.info("%s", "=" * 80)
 
     if hasattr(model, "get_model_info"):
         info = model.get_model_info()
         for key, value in info.items():
-            logger.info(f"  {key}: {value}")
+            logger.info("  %s: %s", key, value)
 
     if hasattr(model, "get_num_parameters"):
         total_params = model.get_num_parameters(trainable_only=False)
         trainable_params = model.get_num_parameters(trainable_only=True)
-        logger.info(f"  Total parameters: {total_params:,}")
-        logger.info(f"  Trainable parameters: {trainable_params:,}")
-        logger.info(f"  Non-trainable parameters: {total_params - trainable_params:,}")
+        logger.info("  Total parameters: %d", total_params)
+        logger.info("  Trainable parameters: %d", trainable_params)
+        logger.info("  Non-trainable parameters: %d", total_params - trainable_params)
 
-    logger.info("=" * 80)
+    logger.info("%s", "=" * 80)

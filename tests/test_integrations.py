@@ -1,19 +1,27 @@
 """Tests for API integration framework."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any
 import asyncio
+from typing import Any, Dict
+from unittest.mock import Mock, patch
+
+import pytest
 import torch
 
-from src.integrations.base import APIIntegration, APIResponse, KnowledgeInjector
-from src.integrations.wolfram_alpha import WolframAlphaIntegration, WolframKnowledgeInjector
-from src.integrations.validators import ResponseValidator, WolframResponseValidator, ContentValidator
+from src.integrations.base import APIIntegration, APIResponse
 from src.integrations.knowledge_injection import (
-    KnowledgeInjectionManager,
     AdditiveInjection,
+    AttentionInjection,
+    KnowledgeInjectionManager,
     MultiplicativeInjection,
-    AttentionInjection
+)
+from src.integrations.validators import (
+    ContentValidator,
+    ResponseValidator,
+    WolframResponseValidator,
+)
+from src.integrations.wolfram_alpha import (
+    WolframAlphaIntegration,
+    WolframKnowledgeInjector,
 )
 
 
@@ -32,30 +40,32 @@ class MockAPIIntegration(APIIntegration):
 
         # Return different responses based on prompt
         if "error" in prompt.lower():
-            return APIResponse(
-                success=False,
-                data=None,
-                error="Mock API error"
-            )
+            return APIResponse(success=False, data=None, error="Mock API error")
         elif "math" in prompt.lower():
             return APIResponse(
                 success=True,
-                data=[{
-                    "title": "Result",
-                    "id": "result",
-                    "subpods": [{"title": "", "plaintext": "42", "img": None}]
-                }],
-                metadata={"query": prompt}
+                data=[
+                    {
+                        "title": "Result",
+                        "id": "result",
+                        "subpods": [{"title": "", "plaintext": "42", "img": None}],
+                    }
+                ],
+                metadata={"query": prompt},
             )
         else:
             return APIResponse(
                 success=True,
-                data=[{
-                    "title": "Response",
-                    "id": "response",
-                    "subpods": [{"title": "", "plaintext": "Mock response", "img": None}]
-                }],
-                metadata={"query": prompt}
+                data=[
+                    {
+                        "title": "Response",
+                        "id": "response",
+                        "subpods": [
+                            {"title": "", "plaintext": "Mock response", "img": None}
+                        ],
+                    }
+                ],
+                metadata={"query": prompt},
             )
 
     def validate_response(self, response: APIResponse) -> bool:
@@ -111,7 +121,7 @@ class TestAPIIntegration:
 class TestWolframAlphaIntegration:
     """Tests for Wolfram Alpha integration."""
 
-    @patch('src.integrations.wolfram_alpha.wolframalpha.Client')
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_wolfram_creation(self, mock_client_class):
         """Test Wolfram Alpha integration creation."""
         mock_client = Mock()
@@ -120,7 +130,7 @@ class TestWolframAlphaIntegration:
         config = {
             "max_queries_per_day": 1000,
             "cache_dir": "./test_cache",
-            "timeout": 30
+            "timeout": 30,
         }
 
         integration = WolframAlphaIntegration("test_key", config)
@@ -130,7 +140,7 @@ class TestWolframAlphaIntegration:
         assert integration.daily_queries == 0
         mock_client_class.assert_called_once_with("test_key")
 
-    @patch('src.integrations.wolfram_alpha.wolframalpha.Client')
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_wolfram_query_success(self, mock_client_class):
         """Test successful Wolfram Alpha query."""
         # Mock the Wolfram Alpha client and result
@@ -161,7 +171,7 @@ class TestWolframAlphaIntegration:
         assert response.data[0]["subpods"][0]["plaintext"] == "42"
         assert integration.daily_queries == 1
 
-    @patch('src.integrations.wolfram_alpha.wolframalpha.Client')
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_wolfram_query_limit_exceeded(self, mock_client_class):
         """Test query limit enforcement."""
         mock_client_class.return_value = Mock()
@@ -174,7 +184,7 @@ class TestWolframAlphaIntegration:
         assert response.success is False
         assert "limit exceeded" in response.error.lower()
 
-    @patch('src.integrations.wolfram_alpha.wolframalpha.Client')
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_wolfram_extract_result(self, mock_client_class):
         """Test mathematical result extraction."""
         mock_client_class.return_value = Mock()
@@ -184,11 +194,13 @@ class TestWolframAlphaIntegration:
         # Test with result pod
         response = APIResponse(
             success=True,
-            data=[{
-                "title": "Result",
-                "id": "result",
-                "subpods": [{"title": "", "plaintext": "3.14159", "img": None}]
-            }]
+            data=[
+                {
+                    "title": "Result",
+                    "id": "result",
+                    "subpods": [{"title": "", "plaintext": "3.14159", "img": None}],
+                }
+            ],
         )
 
         result = integration.extract_mathematical_result(response)
@@ -217,11 +229,13 @@ class TestValidators:
         # Valid response
         valid_response = APIResponse(
             success=True,
-            data=[{
-                "title": "Result",
-                "id": "result",
-                "subpods": [{"title": "", "plaintext": "42", "img": None}]
-            }]
+            data=[
+                {
+                    "title": "Result",
+                    "id": "result",
+                    "subpods": [{"title": "", "plaintext": "42", "img": None}],
+                }
+            ],
         )
         assert validator.validate(valid_response) is True
 
@@ -304,7 +318,7 @@ class TestKnowledgeInjection:
         mock_injector = Mock()
         mock_injector.inject_knowledge.return_value = {
             "injected": True,
-            "validations": [{"expression": "2+2", "wolfram_result": "4"}]
+            "validations": [{"expression": "2+2", "wolfram_result": "4"}],
         }
 
         manager.register_injector("mock", mock_injector)
@@ -324,7 +338,7 @@ class TestKnowledgeInjection:
 class TestWolframKnowledgeInjector:
     """Tests for Wolfram knowledge injector."""
 
-    @patch('src.integrations.wolfram_alpha.wolframalpha.Client')
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_knowledge_injection(self, mock_client_class):
         """Test knowledge injection with Wolfram Alpha."""
         mock_client_class.return_value = Mock()
@@ -337,13 +351,12 @@ class TestWolframKnowledgeInjector:
         model_output = torch.randn(1, 256)
 
         # Mock Wolfram response
-        with patch.object(wolfram, 'query') as mock_query:
+        with patch.object(wolfram, "query") as mock_query:
             mock_query.return_value = APIResponse(
                 success=True,
-                data=[{
-                    "title": "Result",
-                    "subpods": [{"plaintext": "12", "img": None}]
-                }]
+                data=[
+                    {"title": "Result", "subpods": [{"plaintext": "12", "img": None}]}
+                ],
             )
 
             result = injector.inject_knowledge(input_data, model_output)
@@ -378,7 +391,6 @@ class TestAsyncIntegration:
         integration = MockAPIIntegration()
 
         # Simulate async behavior
-        import asyncio
 
         async def async_query():
             await asyncio.sleep(0.01)  # Simulate network delay

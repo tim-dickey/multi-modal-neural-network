@@ -260,7 +260,15 @@ class TestLearningRateScheduling:
         lrs = [initial_lr]
         for _ in range(5):
             if update_freq == "step":
+                # Call optimizer.step() before scheduler.step() to match
+                # PyTorch's recommended ordering and avoid warnings.
+                try:
+                    optimizer.step()
+                except Exception:
+                    # Some optimizers may require gradients; ignore in tests
+                    pass
                 scheduler.step()
+
             lrs.append(optimizer.param_groups[0]["lr"])
 
         # After warmup, LR should have increased
@@ -285,7 +293,12 @@ class TestLearningRateScheduling:
         lrs = [initial_lr]
         for _ in range(100):
             if update_freq == "step":
+                try:
+                    optimizer.step()
+                except Exception:
+                    pass
                 scheduler.step()
+
             lrs.append(optimizer.param_groups[0]["lr"])
 
         # Learning rate should decrease

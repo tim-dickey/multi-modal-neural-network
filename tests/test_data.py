@@ -445,9 +445,7 @@ class TestDataLoaders:
 
         from torch.utils.data import DataLoader
 
-        data_loader = DataLoader(
-            dataset, batch_size=2, shuffle=False
-        )
+        data_loader = DataLoader(dataset, batch_size=2, shuffle=False)
 
         # Iterate through one batch
         for batch in data_loader:

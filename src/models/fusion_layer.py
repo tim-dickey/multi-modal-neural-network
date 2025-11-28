@@ -1,7 +1,7 @@
 """Multi-modal fusion layer for combining image and text features."""
 
 import math
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import torch
 import torch.nn as nn
@@ -76,7 +76,7 @@ class CrossModalAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_dropout(x)
 
-        return x  # type: ignore[no-any-return]
+        return x
 
 
 class FusionTransformerBlock(nn.Module):
@@ -333,7 +333,12 @@ class FusionLayer(nn.Module):
             vision_seq_len: only for early fusion
         """
         if self.fusion_type == "early":
-            return self.fusion(vision_features, text_features, text_mask)  # type: ignore[no-any-return]
+            # `self.fusion` is typed as Union[EarlyFusionLayer, LateFusionLayer].
+            # Cast the result to the expected tuple type for early fusion.
+            return cast(
+                Tuple[torch.Tensor, int],
+                self.fusion(vision_features, text_features, text_mask),
+            )
         else:  # late fusion
             assert vision_pooled is not None and text_pooled is not None
             fused = self.fusion(vision_pooled, text_pooled)

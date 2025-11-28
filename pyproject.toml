@@ -170,3 +170,9 @@ module = [
     "wolframalpha.*",
 ]
 ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 88
+extend-select = ["E", "F", "C90"]
+extend-ignore = ["E203"]
+exclude = ["notebooks", "tests", "**/.ipynb_checkpoints/**"]

@@ -251,8 +251,8 @@ class TestGPUTraining:
         optimizer = create_optimizer(model, model_config)
         criterion = create_loss_function(model_config)
 
-        # Create gradient scaler
-        scaler = torch.cuda.amp.GradScaler()
+        # Create gradient scaler using the non-deprecated API
+        scaler = torch.amp.GradScaler("cuda")
 
         # Generate sample batch
         batch_size = 2
@@ -265,7 +265,7 @@ class TestGPUTraining:
         model.train()
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast("cuda"):
             outputs = model(images, input_ids, attention_mask)
             loss = criterion(outputs["logits"], labels)
 

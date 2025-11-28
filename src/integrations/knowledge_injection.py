@@ -1,8 +1,13 @@
-"""Knowledge injection utilities for integrating external knowledge into model training."""
+"""
+Knowledge injection utilities for integrating external knowledge into
+model training.
+"""
 
 from typing import Any, Dict, List, Optional, Protocol, cast
+
 import torch
 import torch.nn as nn
+
 from .base import KnowledgeInjector
 
 
@@ -19,7 +24,7 @@ class InjectionStrategy(Protocol):
         Returns:
             Modified model output
         """
-        ...
+        raise NotImplementedError()
 
 
 class AdditiveInjection:
@@ -94,7 +99,9 @@ class AttentionInjection:
         attn_weights = torch.sigmoid(self.attention(combined))  # [batch, seq, 1]
 
         # Blend outputs
-        return (1 - self.weight * attn_weights) * model_output + self.weight * attn_weights * knowledge
+        return (
+            1 - self.weight * attn_weights
+        ) * model_output + self.weight * attn_weights * knowledge
 
 
 class KnowledgeInjectionManager:
@@ -107,7 +114,7 @@ class KnowledgeInjectionManager:
 
         # Default injection strategy
         self.default_strategy = AdditiveInjection(
-            weight=config.get('default_injection_weight', 0.1)
+            weight=config.get("default_injection_weight", 0.1)
         )
 
     def register_injector(self, name: str, injector: KnowledgeInjector) -> None:
@@ -133,7 +140,7 @@ class KnowledgeInjectionManager:
         input_data: Any,
         model_output: torch.Tensor,
         injector_name: Optional[str] = None,
-        strategy_name: Optional[str] = None
+        strategy_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Inject knowledge using specified injector and strategy.
 
@@ -152,10 +159,7 @@ class KnowledgeInjectionManager:
         elif self.injectors:
             injector = next(iter(self.injectors.values()))
         else:
-            return {
-                "success": False,
-                "error": "No knowledge injectors registered"
-            }
+            return {"success": False, "error": "No knowledge injectors registered"}
 
         # Get knowledge from injector
         knowledge_data = injector.inject_knowledge(input_data, model_output)
@@ -163,7 +167,7 @@ class KnowledgeInjectionManager:
         if not knowledge_data.get("injected", False):
             return {
                 "success": False,
-                "reason": knowledge_data.get("reason", "Injection not triggered")
+                "reason": knowledge_data.get("reason", "Injection not triggered"),
             }
 
         # Select strategy
@@ -180,13 +184,10 @@ class KnowledgeInjectionManager:
                 "modified_output": modified_output,
                 "knowledge_data": knowledge_data,
                 "injector_used": injector.__class__.__name__,
-                "strategy_used": strategy.__class__.__name__
+                "strategy_used": strategy.__class__.__name__,
             }
         except Exception as e:  # pylint: disable=broad-except
-            return {
-                "success": False,
-                "error": f"Injection failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Injection failed: {str(e)}"}
 
     def get_available_injectors(self) -> List[str]:
         """Get list of available injector names.

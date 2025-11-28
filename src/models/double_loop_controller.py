@@ -1,6 +1,6 @@
 """Double-loop learning controller for meta-learning and structural adaptation."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import torch
 import torch.nn as nn

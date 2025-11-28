@@ -1,6 +1,6 @@
 """Vision Transformer (ViT) encoder for image processing."""
 
-from typing import Dict, Optional, Tuple, Any
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn

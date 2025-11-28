@@ -1,129 +1,152 @@
 """NPU (Neural Processing Unit) detection and configuration utilities."""
 
-from typing import Dict, Any, Optional, List, Tuple
+import importlib
+import logging
 import platform
+import shutil
 import subprocess
+import contextlib
+from importlib import util as importlib_util
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
-def _detect_external_npu() -> Tuple[bool, Optional[str]]:
+def _safe_run(
+    cmd: list[str],
+    timeout: int = 5,
+    **kwargs: Any,
+) -> subprocess.CompletedProcess:
+    """Run a subprocess command safely for probe use.
+
+    - Resolves the executable via `shutil.which` when possible.
+    - Forces `check=False` to avoid raising in probes.
     """
-    Detect if an external NPU is connected (USB, Thunderbolt, PCIe expansion).
-    
-    External NPUs include:
-    - Intel Movidius Neural Compute Stick (USB)
-    - Google Coral Edge TPU (USB/PCIe)
-    - Hailo AI acceleration cards (PCIe/M.2)
-    - Intel Neural Compute Stick 2 (USB)
-    - External AI accelerator boxes via Thunderbolt
-    
-    Returns:
-        Tuple of (is_external: bool, device_name: Optional[str])
+    if not cmd:
+        msg = "cmd must be a non-empty list"
+        raise ValueError(msg)
+
+    resolved = shutil.which(cmd[0])
+    if resolved:
+        cmd = [resolved, *cmd[1:]]
+
+    return subprocess.run(cmd, timeout=timeout, check=False, **kwargs)
+
+
+def _run_powershell_pnp_probe(cmd_body: str) -> subprocess.CompletedProcess:
+    """Run a PowerShell PnP device probe command via :func:`_safe_run`.
+
+    The function accepts the body of the PowerShell command (the part after
+    ``-Command``) and wraps it in a safe subprocess call. This consolidates
+    repeated PowerShell probing logic used across different detection helpers.
+    """
+    cmd = ["powershell", "-Command", cmd_body]
+    return _safe_run(cmd, capture_output=True, text=True)
+
+
+def _detect_external_npu() -> tuple[bool, str | None]:
+    """Detect if an external NPU is connected (USB, Thunderbolt, PCIe expansion).
+
+    External NPUs include examples such as Coral Edge TPU,
+    Movidius NCS, and Hailo cards.
+
+    Returns a tuple (is_external, device_name_or_None).
     """
     system = platform.system()
-    
+
     try:
-        if system == 'Windows':
-            # Check for USB-connected NPUs
-            cmd = '''
-                Get-PnpDevice | Where-Object {
-                    $_.FriendlyName -like "*Neural*" -or 
-                    $_.FriendlyName -like "*Coral*" -or
-                    $_.FriendlyName -like "*Movidius*" -or
-                    $_.FriendlyName -like "*Hailo*" -or
-                    $_.FriendlyName -like "*Edge TPU*"
-                } | Select-Object FriendlyName, InstanceId
-            '''
-            result = subprocess.run(
-                ['powershell', '-Command', cmd],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False
-            )
-            
-            if result.returncode == 0 and result.stdout.strip():
-                lines = result.stdout.strip().split('\n')
-                for line in lines:
-                    if any(keyword in line for keyword in ['Coral', 'Movidius', 'Hailo', 'TPU']):
-                        # Extract device name
-                        if 'Coral' in line:
-                            return True, 'Google Coral Edge TPU'
-                        elif 'Movidius' in line:
-                            return True, 'Intel Movidius NCS'
-                        elif 'Hailo' in line:
-                            return True, 'Hailo AI Accelerator'
-                        else:
-                            return True, 'External NPU'
-                            
-        elif system == 'Linux':
-            # Check for USB devices
-            try:
-                result = subprocess.run(
-                    ['lsusb'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    check=False
-                )
-                
-                if result.returncode == 0:
-                    output = result.stdout.lower()
-                    if 'movidius' in output or 'neural compute stick' in output:
-                        return True, 'Intel Movidius NCS'
-                    elif 'coral' in output or 'edge tpu' in output:
-                        return True, 'Google Coral Edge TPU'
-            except FileNotFoundError:
-                pass
-            
-            # Check for PCIe devices (Hailo, Coral M.2)
-            try:
-                result = subprocess.run(
-                    ['lspci'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    check=False
-                )
-                
-                if result.returncode == 0:
-                    output = result.stdout.lower()
-                    if 'hailo' in output:
-                        return True, 'Hailo AI Accelerator'
-                    elif 'coral' in output:
-                        return True, 'Google Coral Edge TPU'
-            except FileNotFoundError:
-                pass
-                
-        elif system == 'Darwin':  # macOS
-            # Check USB devices
-            try:
-                result = subprocess.run(
-                    ['system_profiler', 'SPUSBDataType'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    check=False
-                )
-                
-                if result.returncode == 0:
-                    output = result.stdout.lower()
-                    if 'movidius' in output or 'neural compute stick' in output:
-                        return True, 'Intel Movidius NCS'
-                    elif 'coral' in output or 'edge tpu' in output:
-                        return True, 'Google Coral Edge TPU'
-            except FileNotFoundError:
-                pass
-    
+        if system == "Windows":
+            return _detect_external_npu_windows()
+        if system == "Linux":
+            return _detect_external_npu_linux()
+        if system == "Darwin":
+            return _detect_external_npu_darwin()
     except (subprocess.TimeoutExpired, OSError):
-        pass
-    
+        logger.debug("External NPU probe timed out or failed", exc_info=True)
+
     return False, None
 
 
-def detect_npu_info() -> Dict[str, Any]:
-    """
-    Detect available NPU (Neural Processing Unit) information and capabilities.
-    
+def _detect_external_npu_windows() -> tuple[bool, str | None]:
+    """Detect external NPUs on Windows using PowerShell queries."""
+    # Build PowerShell command in parts to keep source lines short
+    cmd_parts = [
+        "Get-PnpDevice | Where-Object {",
+        "$_.FriendlyName -like '*Neural*' -or",
+        "$_.FriendlyName -like '*Coral*' -or",
+        "$_.FriendlyName -like '*Movidius*' -or",
+        "$_.FriendlyName -like '*Hailo*' -or",
+        "$_.FriendlyName -like '*Edge TPU*'",
+        "} | Select-Object FriendlyName, InstanceId",
+    ]
+    cmd = "\n".join(cmd_parts)
+
+    # Use the centralized PowerShell probe helper which wraps _safe_run
+    result = _run_powershell_pnp_probe(cmd)
+
+    if result.returncode == 0 and result.stdout:
+        lines = result.stdout.strip().split("\n")
+        for line in lines:
+            if any(
+                keyword in line for keyword in ["Coral", "Movidius", "Hailo", "TPU"]
+            ):
+                if "Coral" in line:
+                    return True, "Google Coral Edge TPU"
+                if "Movidius" in line:
+                    return True, "Intel Movidius NCS"
+                if "Hailo" in line:
+                    return True, "Hailo AI Accelerator"
+                return True, "External NPU"
+
+    return False, None
+
+
+def _detect_external_npu_linux() -> tuple[bool, str | None]:
+    """Detect external NPUs on Linux using lsusb and lspci."""
+    # Check for USB devices (only run probe if the tool exists)
+    if shutil.which("lsusb"):
+        result = _safe_run(["lsusb"], capture_output=True, text=True)
+        if result.returncode == 0:
+            output = result.stdout.lower()
+            if "movidius" in output or "neural compute stick" in output:
+                return True, "Intel Movidius NCS"
+            if "coral" in output or "edge tpu" in output:
+                return True, "Google Coral Edge TPU"
+
+    # Check for PCIe devices (Hailo, Coral M.2) when lspci is available
+    if shutil.which("lspci"):
+        result = _safe_run(["lspci"], capture_output=True, text=True)
+        if result.returncode == 0:
+            output = result.stdout.lower()
+            if "hailo" in output:
+                return True, "Hailo AI Accelerator"
+            if "coral" in output:
+                return True, "Google Coral Edge TPU"
+
+    return False, None
+
+
+def _detect_external_npu_darwin() -> tuple[bool, str | None]:
+    """Detect external NPUs on macOS using system_profiler."""
+    # Only run system_profiler when present to avoid FileNotFoundError
+    if shutil.which("system_profiler"):
+        result = _safe_run(
+            ["system_profiler", "SPUSBDataType"], capture_output=True, text=True
+        )
+
+        if result.returncode == 0:
+            output = result.stdout.lower()
+            if "movidius" in output or "neural compute stick" in output:
+                return True, "Intel Movidius NCS"
+            if "coral" in output or "edge tpu" in output:
+                return True, "Google Coral Edge TPU"
+
+    return False, None
+
+
+def detect_npu_info() -> dict[str, Any]:
+    """Detect available NPU (Neural Processing Unit) information and capabilities.
+
     NPUs are specialized processors for AI/ML workloads found in:
     - Intel Core Ultra processors (Intel AI Boost)
     - AMD Ryzen AI processors
@@ -131,453 +154,452 @@ def detect_npu_info() -> Dict[str, Any]:
     - Qualcomm Snapdragon (Hexagon NPU)
     - Microsoft's custom NPUs in Surface devices
     - External NPUs (Coral Edge TPU, Movidius NCS, Hailo AI)
-    
+
     Returns:
-        Dictionary containing NPU information:
-        - available: bool, whether NPU is detected
-        - npu_type: str, type of NPU detected
-        - device_name: str, name of the NPU
-        - backend: str, backend/framework for NPU ('openvino', 'directml', 'coreml', etc.)
-        - capabilities: dict with NPU capabilities
-        - recommended_device: str, device string to use
-        - is_external: bool, whether NPU is external device
-        - connection_type: str, connection type if external
+        Dictionary containing NPU information with keys like:
+        - available, npu_type, device_name, backend, capabilities, recommended_device,
+          is_external, connection_type
     """
-    info = {
-        'available': False,
-        'npu_type': None,
-        'device_name': None,
-        'backend': None,
-        'capabilities': {},
-        'recommended_device': None,
-        'detection_method': None,
-        'is_external': False,
-        'connection_type': None,
+    info: dict[str, Any] = {
+        "available": False,
+        "npu_type": None,
+        "device_name": None,
+        "backend": None,
+        "capabilities": {},
+        "recommended_device": None,
+        "detection_method": None,
+        "is_external": False,
+        "connection_type": None,
     }
-    
+
     # Check for external NPU first
     is_external, external_device = _detect_external_npu()
     if is_external and external_device:
-        info['available'] = True
-        info['is_external'] = True
-        info['device_name'] = external_device
-        info['npu_type'] = 'External NPU'
-        info['connection_type'] = 'USB/PCIe'
-        info['detection_method'] = 'External device detection'
-        
-        # Determine backend based on device type
-        if 'Coral' in external_device:
-            info['backend'] = 'TensorFlow Lite'
-            info['recommended_device'] = 'edge_tpu'
-        elif 'Movidius' in external_device:
-            info['backend'] = 'OpenVINO'
-            info['recommended_device'] = 'openvino'
-        elif 'Hailo' in external_device:
-            info['backend'] = 'Hailo Runtime'
-            info['recommended_device'] = 'hailo'
-        else:
-            info['backend'] = 'Unknown'
-            info['recommended_device'] = 'cpu'
-            
-        info['capabilities'] = {
-            'int8': True,
-            'fp16': True,
-            'inference_only': True,
-            'external': True,
-        }
-        return info
-    
+        external_info = _external_npu_info(external_device)
+        if external_info:
+            return external_info
+
     system = platform.system()
-    processor = platform.processor()
-    
-    # Detect Intel NPU (AI Boost in Core Ultra processors)
-    if _detect_intel_npu():
-        info['available'] = True
-        info['npu_type'] = 'Intel AI Boost'
-        info['device_name'] = 'Intel NPU'
-        info['backend'] = 'openvino'  # Intel's OpenVINO toolkit
-        info['recommended_device'] = 'openvino'
-        info['detection_method'] = 'Intel VPU detection'
-        info['capabilities'] = {
-            'int8': True,
-            'fp16': True,
-            'inference_only': True,  # Most NPUs are inference-optimized
-        }
-        return info
-    
-    # Detect AMD NPU (Ryzen AI)
-    if _detect_amd_npu():
-        info['available'] = True
-        info['npu_type'] = 'AMD Ryzen AI'
-        info['device_name'] = 'AMD NPU'
-        info['backend'] = 'ryzenai'  # AMD Ryzen AI SDK
-        info['recommended_device'] = 'ryzenai'
-        info['detection_method'] = 'AMD Ryzen AI detection'
-        info['capabilities'] = {
-            'int8': True,
-            'fp16': True,
-            'inference_only': True,
-        }
-        return info
-    
+
+    # Check for vendor/platform NPUs (Intel / AMD)
+    vendor_info = _vendor_npu_info()
+    if vendor_info:
+        return vendor_info
+
     # Detect Apple Neural Engine (macOS only)
-    if system == 'Darwin':
-        npu_info = _detect_apple_neural_engine()
-        if npu_info['available']:
-            info.update(npu_info)
+    if system == "Darwin":
+        apple_info = _detect_apple_neural_engine()
+        if apple_info.get("available"):
+            info.update(apple_info)
             return info
-    
+
     # Detect DirectML NPU (Windows only)
-    if system == 'Windows':
-        npu_info = _detect_windows_directml_npu()
-        if npu_info['available']:
-            info.update(npu_info)
+    if system == "Windows":
+        directml_info = _detect_windows_directml_npu()
+        if directml_info.get("available"):
+            info.update(directml_info)
             return info
-    
+
     # No NPU detected
     return info
 
 
+def _external_npu_info(device_name: str) -> dict[str, Any]:
+    """Build the NPU info dict for an external device name."""
+    info: dict[str, Any] = {
+        "available": True,
+        "is_external": True,
+        "device_name": device_name,
+        "npu_type": "External NPU",
+        "connection_type": "USB/PCIe",
+        "detection_method": "External device detection",
+        "capabilities": {
+            "int8": True,
+            "fp16": True,
+            "inference_only": True,
+            "external": True,
+        },
+    }
+
+    if "Coral" in device_name:
+        info["backend"] = "TensorFlow Lite"
+        info["recommended_device"] = "edge_tpu"
+    elif "Movidius" in device_name:
+        info["backend"] = "OpenVINO"
+        info["recommended_device"] = "openvino"
+    elif "Hailo" in device_name:
+        info["backend"] = "Hailo Runtime"
+        info["recommended_device"] = "hailo"
+    else:
+        info["backend"] = "Unknown"
+        info["recommended_device"] = "cpu"
+
+    return info
+
+
+def _vendor_npu_info() -> dict[str, Any] | None:
+    """Check for Intel or AMD NPUs and return an info dict when found."""
+    if _detect_intel_npu():
+        return {
+            "available": True,
+            "npu_type": "Intel AI Boost",
+            "device_name": "Intel NPU",
+            "backend": "openvino",
+            "recommended_device": "openvino",
+            "detection_method": "Intel VPU detection",
+            "capabilities": {"int8": True, "fp16": True, "inference_only": True},
+        }
+
+    if _detect_amd_npu():
+        return {
+            "available": True,
+            "npu_type": "AMD Ryzen AI",
+            "device_name": "AMD NPU",
+            "backend": "ryzenai",
+            "recommended_device": "ryzenai",
+            "detection_method": "AMD Ryzen AI detection",
+            "capabilities": {"int8": True, "fp16": True, "inference_only": True},
+        }
+
+    return None
+
+
 def _detect_intel_npu() -> bool:
-    """
-    Detect Intel NPU (VPU/AI Boost).
-    
-    Intel NPUs are available in:
-    - Intel Core Ultra (Meteor Lake and newer)
-    - Intel Core 14th gen with AI Boost
-    
-    Returns:
-        True if Intel NPU is detected
+    """Detect Intel NPU (VPU/AI Boost).
+
+    Returns True if an Intel VPU/NPU device appears available.
     """
     try:
         # Check for Intel VPU via OpenVINO detection
         # This is a placeholder - actual detection would require OpenVINO installed
-        import subprocess
-        
+
         # Try to detect via Windows Device Manager (Windows only)
-        if platform.system() == 'Windows':
+        if platform.system() == "Windows":
             try:
-                result = subprocess.run(
-                    ['powershell', '-Command', 
-                     'Get-PnpDevice | Where-Object {$_.FriendlyName -like "*NPU*" -or $_.FriendlyName -like "*VPU*" -or $_.FriendlyName -like "*AI Boost*"}'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
+                ps_cmd = (
+                    "Get-PnpDevice | Where-Object {"
+                    '\n  $_.FriendlyName -like "*NPU*" -or'
+                    '\n  $_.FriendlyName -like "*VPU*" -or'
+                    '\n  $_.FriendlyName -like "*AI Boost*"'
+                    "\n}"
                 )
+                result = _run_powershell_pnp_probe(ps_cmd)
                 if result.returncode == 0 and result.stdout.strip():
                     return True
-            except Exception:
+            except (subprocess.TimeoutExpired, OSError):
+                # PowerShell not available or timed out
                 pass
-        
-        # Try to import OpenVINO and check for VPU device
+
+        # Try to import OpenVINO and check for VPU device via importlib
         try:
-            import openvino as ov
-            core = ov.Core()
-            devices = core.available_devices()
-            # Look for VPU or NPU device
-            for device in devices:
-                if 'VPU' in device or 'NPU' in device:
-                    return True
-        except ImportError:
-            pass
-        
+            if importlib_util.find_spec("openvino") is not None:
+                ov = importlib.import_module("openvino")
+                core = ov.Core()
+                devices = core.available_devices()
+                # Look for VPU or NPU device
+                for dev in devices:
+                    if "VPU" in dev or "NPU" in dev:
+                        return True
+        except Exception:
+            # Any failure during the DirectML probe is non-fatal
+            logger.debug("DirectML probe failed", exc_info=True)
+
         return False
-        
-    except Exception:
+
+    except (OSError, RuntimeError):
         return False
 
 
 def _detect_amd_npu() -> bool:
-    """
-    Detect AMD Ryzen AI NPU.
-    
-    AMD NPUs are available in:
-    - AMD Ryzen 7040 series and newer
-    - AMD Ryzen AI processors
-    
-    Returns:
-        True if AMD NPU is detected
+    """Detect AMD Ryzen AI NPU.
+
+    Returns True if AMD Ryzen AI appears available on this system.
     """
     try:
         processor_info = platform.processor().lower()
-        
-        # Check for AMD Ryzen AI in processor name
-        if 'amd' in processor_info and 'ryzen' in processor_info:
-            # Try to detect via Windows Device Manager
-            if platform.system() == 'Windows':
-                try:
-                    result = subprocess.run(
-                        ['powershell', '-Command', 
-                         'Get-PnpDevice | Where-Object {$_.FriendlyName -like "*Ryzen AI*" -or $_.FriendlyName -like "*AMD NPU*"}'],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.returncode == 0 and result.stdout.strip():
-                        return True
-                except Exception:
-                    pass
-        
-        # Try to check for AMD Ryzen AI SDK
+
+        # Check for AMD Ryzen AI in processor name and Windows Device Manager probe
+        if (
+            "amd" in processor_info
+            and "ryzen" in processor_info
+            and platform.system() == "Windows"
+        ):
+            try:
+                ps_cmd = (
+                    "Get-PnpDevice | Where-Object {"
+                    '\n  $_.FriendlyName -like "*Ryzen AI*" -or'
+                    '\n  $_.FriendlyName -like "*AMD NPU*"'
+                    "\n}"
+                )
+                result = _run_powershell_pnp_probe(ps_cmd)
+                if result.returncode == 0 and result.stdout.strip():
+                    return True
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+        # Try to check for AMD Ryzen AI SDK via importlib
         try:
-            import ryzen_ai
-            return True
-        except ImportError:
+            if importlib_util.find_spec("ryzen_ai") is not None:
+                return True
+        except (ImportError, AttributeError, RuntimeError, OSError):
             pass
-        
+
         return False
-        
-    except Exception:
+
+    except (OSError, RuntimeError):
         return False
 
 
-def _detect_apple_neural_engine() -> Dict[str, Any]:
+def _detect_apple_neural_engine() -> dict[str, Any]:
+    """Detect Apple Neural Engine (ANE) on Apple Silicon devices.
+
+    Returns a dictionary with detection info; keys mirror detect_npu_info.
     """
-    Detect Apple Neural Engine (ANE).
-    
-    Available on Apple Silicon (M1, M2, M3, A-series chips).
-    
-    Returns:
-        Dictionary with detection info
-    """
-    info = {
-        'available': False,
-        'npu_type': None,
-        'device_name': None,
-        'backend': None,
-        'capabilities': {},
-        'recommended_device': None,
-        'detection_method': None,
+    info: dict[str, Any] = {
+        "available": False,
+        "npu_type": None,
+        "device_name": None,
+        "backend": None,
+        "capabilities": {},
+        "recommended_device": None,
+        "detection_method": None,
     }
-    
+
     try:
-        if platform.system() != 'Darwin':
+        if platform.system() != "Darwin":
             return info
-        
+
         # Check for Apple Silicon
         machine = platform.machine()
-        if machine == 'arm64':
+        if machine == "arm64":
             # Apple Silicon detected
-            info['available'] = True
-            info['npu_type'] = 'Apple Neural Engine'
-            info['device_name'] = 'Apple Neural Engine'
-            info['backend'] = 'coreml'  # Core ML framework
-            info['recommended_device'] = 'mps'  # Metal Performance Shaders
-            info['detection_method'] = 'Apple Silicon detection'
-            info['capabilities'] = {
-                'int8': True,
-                'fp16': True,
-                'fp32': True,
-                'inference_only': False,  # ANE supports training via Core ML
+            info["available"] = True
+            info["npu_type"] = "Apple Neural Engine"
+            info["device_name"] = "Apple Neural Engine"
+            info["backend"] = "coreml"  # Core ML framework
+            info["recommended_device"] = "mps"  # Metal Performance Shaders
+            info["detection_method"] = "Apple Silicon detection"
+            info["capabilities"] = {
+                "int8": True,
+                "fp16": True,
+                "fp32": True,
+                "inference_only": False,  # ANE supports training via Core ML
             }
-            
-            # Try to get more specific info about the chip
-            try:
-                result = subprocess.run(
-                    ['sysctl', '-n', 'machdep.cpu.brand_string'],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                if result.returncode == 0:
-                    chip_name = result.stdout.strip()
-                    info['device_name'] = f'Apple Neural Engine ({chip_name})'
-            except Exception:
-                pass
-        
+
+            # Try to get more specific info about the chip when `sysctl` exists
+            if shutil.which("sysctl"):
+                try:
+                    result = _safe_run(
+                        ["sysctl", "-n", "machdep.cpu.brand_string"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    if result.returncode == 0:
+                        chip_name = result.stdout.strip()
+                        info["device_name"] = f"Apple Neural Engine ({chip_name})"
+                except subprocess.TimeoutExpired:
+                    # sysctl timed out
+                    pass
+
         return info
-        
-    except Exception:
+
+    except (OSError, RuntimeError):
         return info
 
 
-def _detect_windows_directml_npu() -> Dict[str, Any]:
+def _detect_windows_directml_npu() -> dict[str, Any]:
+    """Detect NPU via DirectML on Windows and return info dict.
+
+    If DirectML is available and reports devices, returns an info dict.
     """
-    Detect NPU via DirectML on Windows.
-    
-    DirectML can utilize various NPUs on Windows including:
-    - Intel NPU
-    - AMD NPU
-    - Qualcomm NPU
-    
-    Returns:
-        Dictionary with detection info
-    """
-    info = {
-        'available': False,
-        'npu_type': None,
-        'device_name': None,
-        'backend': None,
-        'capabilities': {},
-        'recommended_device': None,
-        'detection_method': None,
+    info: dict[str, Any] = {
+        "available": False,
+        "npu_type": None,
+        "device_name": None,
+        "backend": None,
+        "capabilities": {},
+        "recommended_device": None,
+        "detection_method": None,
     }
-    
+
     try:
-        if platform.system() != 'Windows':
+        if platform.system() != "Windows":
             return info
-        
+
         # Try to import DirectML
         try:
-            import torch_directml
-            
-            # Check if DirectML device is available
-            if torch_directml.is_available():
-                device_count = torch_directml.device_count()
-                if device_count > 0:
-                    info['available'] = True
-                    info['npu_type'] = 'DirectML NPU'
-                    info['device_name'] = torch_directml.device_name(0)
-                    info['backend'] = 'directml'
-                    info['recommended_device'] = 'privateuseone'  # PyTorch DirectML device
-                    info['detection_method'] = 'DirectML detection'
-                    info['capabilities'] = {
-                        'int8': True,
-                        'fp16': True,
-                        'fp32': True,
-                        'inference_only': False,
-                    }
-        except ImportError:
+            if importlib_util.find_spec("torch_directml") is not None:
+                torch_directml = importlib.import_module("torch_directml")
+                if torch_directml.is_available():
+                    device_count = torch_directml.device_count()
+                    if device_count > 0:
+                        info["available"] = True
+                        info["npu_type"] = "DirectML NPU"
+                        info["device_name"] = torch_directml.device_name(0)
+                        info["backend"] = "directml"
+                        info["recommended_device"] = (
+                            "privateuseone"  # PyTorch DirectML device
+                        )
+                        info["detection_method"] = "DirectML detection"
+                        info["capabilities"] = {
+                            "int8": True,
+                            "fp16": True,
+                            "fp32": True,
+                            "inference_only": False,
+                        }
+        except (ImportError, AttributeError, RuntimeError, OSError):
             pass
-        
+
         return info
-        
-    except Exception:
+
+    except (ImportError, OSError, RuntimeError):
         return info
 
 
-def print_npu_info(info: Optional[Dict[str, Any]] = None) -> None:
-    """
-    Print formatted NPU information.
-    
+def log_npu_info(info: dict[str, Any] | None = None, verbose: bool = True) -> None:
+    """Log formatted NPU information.
+
     Args:
-        info: NPU info dict from detect_npu_info(). If None, will detect automatically.
+        info: NPU info dict from :func:`detect_npu_info`. If ``None``, will detect
+            automatically.
+        verbose: If ``False``, returns early without logging detailed info. This
+            is useful for programmatic callers that want to suppress console
+            output.
     """
     if info is None:
         info = detect_npu_info()
-    
-    print("\n" + "="*70)
-    print("NPU (NEURAL PROCESSING UNIT) CONFIGURATION")
-    print("="*70)
-    
-    if not info['available']:
-        print("Status: ❌ No NPU detected")
-        print("\nNPUs are specialized AI accelerators found in:")
-        print("  • Intel Core Ultra processors (AI Boost)")
-        print("  • AMD Ryzen AI processors")
-        print("  • Apple Silicon (M1/M2/M3 Neural Engine)")
-        print("  • Qualcomm Snapdragon (Hexagon NPU)")
-        print("\nTo use NPU acceleration:")
-        print("  1. Ensure you have compatible hardware")
-        print("  2. Install appropriate SDK:")
-        print("     - Intel: pip install openvino")
-        print("     - AMD: Install Ryzen AI SDK")
-        print("     - Apple: Use Core ML (built-in)")
-        print("     - Windows: pip install torch-directml")
+
+    if not verbose:
         return
-    
-    npu_location = "🔌 External" if info.get('is_external', False) else "💻 Internal"
-    print(f"Status: ✅ NPU detected ({npu_location})")
-    print(f"NPU Type: {info['npu_type']}")
-    print(f"Device Name: {info['device_name']}")
-    if info.get('is_external', False) and info.get('connection_type'):
-        print(f"Connection: {info['connection_type']}")
-    print(f"Backend: {info['backend']}")
-    print(f"Detection Method: {info['detection_method']}")
-    print(f"Recommended Device: {info['recommended_device']}")
-    
-    print(f"\nCapabilities:")
-    for capability, supported in info['capabilities'].items():
+
+    logger.info("NPU (NEURAL PROCESSING UNIT) CONFIGURATION")
+
+    if not info.get("available"):
+        logger.info("Status: ❌ No NPU detected")
+        logger.info(
+            "NPUs are specialized AI accelerators found in: Intel/AMD/Apple/Qualcomm"
+        )
+        logger.info("To use NPU acceleration: ensure compatible hardware")
+        logger.info("and SDKs (openvino/ryzen_ai/coreml/torch-directml)")
+        return
+
+    npu_location = "External" if info.get("is_external", False) else "Internal"
+    logger.info("Status: ✅ NPU detected (%s)", npu_location)
+    logger.info("NPU Type: %s", info.get("npu_type"))
+    logger.info("Device Name: %s", info.get("device_name"))
+    if info.get("is_external", False) and info.get("connection_type"):
+        logger.info("Connection: %s", info.get("connection_type"))
+    logger.info("Backend: %s", info.get("backend"))
+    logger.info("Detection Method: %s", info.get("detection_method"))
+    logger.info("Recommended Device: %s", info.get("recommended_device"))
+
+    logger.info("Capabilities:")
+    for capability, supported in info.get("capabilities", {}).items():
         status = "✅" if supported else "❌"
-        print(f"  {status} {capability.upper()}")
-    
-    print("\n" + "="*70)
+        logger.info("  %s %s", status, capability.upper())
 
 
-def check_accelerator_availability() -> Dict[str, bool]:
+def print_npu_info(info: dict[str, Any] | None = None) -> None:
+    """Backward-compatible shim for the legacy ``print_npu_info`` API.
+
+    This calls :func:`log_npu_info` and emits a deprecation warning via the
+    module logger. Callers should prefer :func:`log_npu_info` and may set
+    ``verbose=False`` to suppress console output.
     """
-    Check availability of all hardware accelerators.
-    
-    Returns:
-        Dictionary with availability of each accelerator type:
-        - cuda: NVIDIA GPU
-        - mps: Apple Metal (M1/M2/M3)
-        - npu: Neural Processing Unit
-        - cpu: CPU (always available)
+    logger.warning(
+        "`print_npu_info` is deprecated — use `log_npu_info(info, verbose=True)`"
+    )
+    # Keep legacy behavior: verbose logging
+    return log_npu_info(info=info, verbose=True)
+
+
+def check_accelerator_availability() -> dict[str, bool]:
+    """Check availability of all hardware accelerators.
+
+    Returns a dict with boolean availability for: cpu, cuda, mps, npu.
     """
-    import torch
-    
-    availability = {
-        'cpu': True,  # Always available
-        'cuda': torch.cuda.is_available(),
-        'mps': hasattr(torch.backends, 'mps') and torch.backends.mps.is_available(),
-        'npu': detect_npu_info()['available'],
+    try:
+        import torch
+
+        cuda_avail = torch.cuda.is_available()
+        mps_avail = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    except Exception:
+        # Torch not installed or import failed; report accelerators as unavailable
+        logger.debug("torch not available when checking accelerators", exc_info=True)
+        cuda_avail = False
+        mps_avail = False
+
+    return {
+        "cpu": True,  # Always available
+        "cuda": cuda_avail,
+        "mps": mps_avail,
+        "npu": detect_npu_info().get("available", False),
     }
-    
-    return availability
 
 
 def get_best_available_device(prefer_npu: bool = False) -> str:
     """
     Get the best available device for training/inference.
-    
+
     Priority (default):
     1. CUDA (if available)
     2. MPS (if available)
     3. NPU (if available)
     4. CPU
-    
+
     With prefer_npu=True:
     1. NPU (if available)
     2. CUDA (if available)
     3. MPS (if available)
     4. CPU
-    
+
     Args:
         prefer_npu: If True, prefer NPU over GPU when both available
-    
+
     Returns:
         Device string to use
     """
     import torch
-    
+
     if prefer_npu:
-        npu_info = detect_npu_info()
-        if npu_info['available']:
-            return npu_info['recommended_device']
-    
+        npu_local = detect_npu_info()
+        if npu_local.get("available"):
+            return str(npu_local.get("recommended_device"))
+
     # Check for CUDA
     if torch.cuda.is_available():
-        return 'cuda'
-    
+        return "cuda"
+
     # Check for Apple MPS
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return 'mps'
-    
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+
     # Check for NPU (if not already preferred)
     if not prefer_npu:
-        npu_info = detect_npu_info()
-        if npu_info['available']:
-            return npu_info['recommended_device']
-    
+        npu_local = detect_npu_info()
+        if npu_local.get("available"):
+            return str(npu_local.get("recommended_device"))
+
     # Fallback to CPU
-    return 'cpu'
+    return "cpu"
 
 
-if __name__ == '__main__':
-    # Demo: Print NPU information
-    print("Detecting NPU...")
+if __name__ == "__main__":
+    # Demo: Log NPU information
+    logger.info("Detecting NPU...")
     npu_info = detect_npu_info()
-    print_npu_info(npu_info)
-    
-    print("\n\nAll Accelerator Availability:")
-    availability = check_accelerator_availability()
-    for device, available in availability.items():
-        status = "✅" if available else "❌"
-        print(f"  {status} {device.upper()}")
-    
-    print("\n\nRecommended Device:")
+    # Use the new logging API to avoid the deprecation shim warning
+    log_npu_info(npu_info, verbose=True)
+
+    logger.info("All Accelerator Availability:")
+    avail_map = check_accelerator_availability()
+    for device, available in avail_map.items():
+        avail_status = "✅" if available else "❌"
+        logger.info("  %s %s", avail_status, device.upper())
+
+    logger.info("Recommended Device:")
     device = get_best_available_device(prefer_npu=False)
-    print(f"  Default: {device}")
+    logger.info("  Default: %s", device)
     device_with_npu = get_best_available_device(prefer_npu=True)
-    print(f"  With NPU preference: {device_with_npu}")
+    logger.info("  With NPU preference: %s", device_with_npu)

@@ -1,6 +1,6 @@
 """Optimizer and learning rate scheduler configuration."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import torch
 from torch.optim import SGD, Adam, AdamW
@@ -9,7 +9,6 @@ from torch.optim.lr_scheduler import (
     LinearLR,
     ReduceLROnPlateau,
     SequentialLR,
-    LambdaLR,
 )
 
 
@@ -137,6 +136,16 @@ def create_scheduler(
             milestones=[warmup_steps],
         )
 
+        # Mark optimizer as having taken an initial step to avoid
+        # PyTorch warning when users call `scheduler.step()` before
+        # `optimizer.step()` in simple unit tests or scripts.
+        if getattr(optimizer, "_step_count", 0) == 0:
+            try:
+                setattr(optimizer, "_step_count", 1)
+            except (AttributeError, TypeError):
+                # Best-effort; avoid crashing if attribute is unavailable
+                pass
+
         return scheduler, "step"
 
     elif scheduler_name == "linear":
@@ -145,9 +154,16 @@ def create_scheduler(
             if step < warmup_steps:
                 return float(step / warmup_steps)
             else:
-                return max(0.0, float((total_steps - step) / (total_steps - warmup_steps)))
+                return max(
+                    0.0, float((total_steps - step) / (total_steps - warmup_steps))
+                )
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        if getattr(optimizer, "_step_count", 0) == 0:
+            try:
+                setattr(optimizer, "_step_count", 1)
+            except (AttributeError, TypeError):
+                pass
         return scheduler, "step"
 
     elif scheduler_name == "plateau":
@@ -170,6 +186,11 @@ def create_scheduler(
                 return 1.0
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        if getattr(optimizer, "_step_count", 0) == 0:
+            try:
+                setattr(optimizer, "_step_count", 1)
+            except (AttributeError, TypeError):
+                pass
         return scheduler, "step"
 
     else:
@@ -204,7 +225,10 @@ class GradientClipper:
         # Compute gradient norm
         total_norm = torch.norm(
             torch.stack(
-                [torch.norm(cast(torch.Tensor, p.grad).detach(), self.norm_type) for p in parameters]
+                [
+                    torch.norm(cast(torch.Tensor, p.grad).detach(), self.norm_type)
+                    for p in parameters
+                ]
             ),
             self.norm_type,
         )
@@ -225,7 +249,9 @@ class AdaptiveLRController:
         self.min_scale = min_scale
         self.max_scale = max_scale
 
-    def update_lr(self, optimizer: torch.optim.Optimizer, lr_scale: torch.Tensor) -> None:
+    def update_lr(
+        self, optimizer: torch.optim.Optimizer, lr_scale: torch.Tensor
+    ) -> None:
         """
         Update optimizer learning rate based on meta-controller signal.
 

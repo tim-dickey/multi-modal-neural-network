@@ -1,6 +1,6 @@
 """Task-specific prediction heads for multi-modal model."""
 
-from typing import Any, Dict, Optional, Union, Tuple, cast
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -36,7 +36,7 @@ class ClassificationHead(nn.Module):
         Returns:
             logits: (batch_size, num_classes)
         """
-        return self.head(x)  # type: ignore[no-any-return]
+        return self.head(x)
 
 
 class RegressionHead(nn.Module):
@@ -60,7 +60,7 @@ class RegressionHead(nn.Module):
         Returns:
             predictions: (batch_size, output_dim)
         """
-        return self.head(x)  # type: ignore[no-any-return]
+        return self.head(x)
 
 
 class MultiLabelHead(nn.Module):
@@ -85,7 +85,7 @@ class MultiLabelHead(nn.Module):
         Returns:
             probabilities: (batch_size, num_labels)
         """
-        return self.head(x)  # type: ignore[no-any-return]
+        return self.head(x)
 
 
 class ContrastiveHead(nn.Module):
@@ -143,7 +143,7 @@ class ContrastiveHead(nn.Module):
         logit_scale = self.logit_scale.exp()
         similarity = logit_scale * image_proj @ text_proj.t()
 
-        return similarity  # type: ignore[no-any-return]
+        return similarity
 
 
 class SequenceGenerationHead(nn.Module):
@@ -227,7 +227,7 @@ class SequenceGenerationHead(nn.Module):
         # Project to vocabulary
         logits = self.output_proj(decoder_output)
 
-        return logits  # type: ignore[no-any-return]
+        return logits
 
 
 class MultiTaskHead(nn.Module):
@@ -250,7 +250,9 @@ class MultiTaskHead(nn.Module):
         for task_name, task_config in tasks.items():
             task_type = task_config.get("type", "classification")
 
-            head: Union[ClassificationHead, RegressionHead, MultiLabelHead, ContrastiveHead]
+            head: Union[
+                ClassificationHead, RegressionHead, MultiLabelHead, ContrastiveHead
+            ]
 
             if task_type == "classification":
                 head = ClassificationHead(

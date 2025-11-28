@@ -56,7 +56,7 @@ class TextEmbedding(nn.Module):
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
 
-        return embeddings  # type: ignore[no-any-return]
+        return embeddings
 
 
 class TextMultiHeadAttention(nn.Module):
@@ -125,7 +125,7 @@ class TextMultiHeadAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_dropout(x)
 
-        return x  # type: ignore[no-any-return]
+        return x
 
 
 class TextTransformerBlock(nn.Module):

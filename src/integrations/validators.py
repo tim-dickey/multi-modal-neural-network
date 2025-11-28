@@ -1,8 +1,9 @@
 """Validation utilities for API responses and knowledge injection."""
 
-from typing import Any, Dict, Optional
-from collections import UserDict
 import re
+from collections import UserDict
+from typing import Any, Dict, Optional
+
 from .base import APIResponse
 
 
@@ -70,8 +71,8 @@ class ContentValidator:
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
-        self.min_confidence = self.config.get('min_confidence', 0.5)
-        self.max_length = self.config.get('max_length', 10000)
+        self.min_confidence = self.config.get("min_confidence", 0.5)
+        self.max_length = self.config.get("max_length", 10000)
 
     class ValidationResult(UserDict):
         """Dict-like result that also allows attribute access (e.g., .valid)."""
@@ -92,29 +93,35 @@ class ContentValidator:
             Dictionary with validation results and metadata
         """
         if not content or not isinstance(content, str):
-            return self.ValidationResult({
-                "valid": False,
-                "reason": "Empty or invalid content",
-                "confidence": 0.0
-            })
+            return self.ValidationResult(
+                {
+                    "valid": False,
+                    "reason": "Empty or invalid content",
+                    "confidence": 0.0,
+                }
+            )
 
         if len(content) > self.max_length:
-            return self.ValidationResult({
-                "valid": False,
-                "reason": f"Content too long ({len(content)} > {self.max_length})",
-                "confidence": 0.0
-            })
+            return self.ValidationResult(
+                {
+                    "valid": False,
+                    "reason": f"Content too long ({len(content)} > {self.max_length})",
+                    "confidence": 0.0,
+                }
+            )
 
         # Basic quality checks
         quality_score = self._calculate_quality_score(content)
 
-        return self.ValidationResult({
-            "valid": quality_score >= self.min_confidence,
-            "confidence": quality_score,
-            "length": len(content),
-            "has_numbers": bool(re.search(r'\d', content)),
-            "has_text": len(content.strip()) > 0
-        })
+        return self.ValidationResult(
+            {
+                "valid": quality_score >= self.min_confidence,
+                "confidence": quality_score,
+                "length": len(content),
+                "has_numbers": bool(re.search(r"\d", content)),
+                "has_text": len(content.strip()) > 0,
+            }
+        )
 
     def _calculate_quality_score(self, content: str) -> float:
         """Calculate a quality score for the content.
@@ -134,15 +141,15 @@ class ContentValidator:
             score += 0.1
 
         # Content diversity
-        if re.search(r'[a-zA-Z]', content):  # Has letters
+        if re.search(r"[a-zA-Z]", content):  # Has letters
             score += 0.2
-        if re.search(r'\d', content):  # Has numbers
+        if re.search(r"\d", content):  # Has numbers
             score += 0.2
-        if re.search(r'[^\w\s]', content):  # Has special characters
+        if re.search(r"[^\w\s]", content):  # Has special characters
             score += 0.1
 
         # Structure check
-        if '\n' in content or '.' in content:
+        if "\n" in content or "." in content:
             score += 0.2
 
         return min(score, 1.0)
@@ -165,19 +172,18 @@ class KnowledgeInjectionValidator:
             Validation results
         """
         if not isinstance(injection_data, dict):
-            return {
-                "valid": False,
-                "reason": "Injection data must be a dictionary"
-            }
+            return {"valid": False, "reason": "Injection data must be a dictionary"}
 
         # Check required fields
         required_fields = ["injected", "injection_type"]
-        missing_fields = [field for field in required_fields if field not in injection_data]
+        missing_fields = [
+            field for field in required_fields if field not in injection_data
+        ]
 
         if missing_fields:
             return {
                 "valid": False,
-                "reason": f"Missing required fields: {missing_fields}"
+                "reason": f"Missing required fields: {missing_fields}",
             }
 
         # Validate injection content if present
@@ -188,21 +194,28 @@ class KnowledgeInjectionValidator:
                     if isinstance(validation, dict) and "wolfram_result" in validation:
                         result = validation["wolfram_result"]
                         if result:
-                            content_validation = self.content_validator.validate_content(result)
+                            content_validation = (
+                                self.content_validator.validate_content(result)
+                            )
                             if not content_validation["valid"]:
                                 return {
                                     "valid": False,
-                                    "reason": f"Invalid validation content at index {i}: {content_validation['reason']}"
+                                    "reason": (
+                                        f"Invalid validation content at index {i}: "
+                                        f"{content_validation['reason']}"
+                                    ),
                                 }
 
         return {
             "valid": True,
             "injection_type": injection_data.get("injection_type"),
-            "weight": injection_data.get("weight", 0.0)
+            "weight": injection_data.get("weight", 0.0),
         }
 
 
-def create_validator(api_name: str, config: Optional[Dict[str, Any]] = None) -> ResponseValidator:
+def create_validator(
+    api_name: str, config: Optional[Dict[str, Any]] = None
+) -> ResponseValidator:
     """Factory function to create appropriate validator for an API.
 
     Args:

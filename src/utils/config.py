@@ -54,7 +54,7 @@ def _resolve_env_vars(config: Any) -> Any:
 def get_project_root() -> Path:
     """
     Get the project root directory.
-    
+
     Returns:
         Path to project root
     """
@@ -64,38 +64,40 @@ def get_project_root() -> Path:
         if (current / ".git").exists():
             return current
         current = current.parent
-    
+
     # Fallback to parent of src directory
     return Path(__file__).resolve().parent.parent.parent
 
 
-def resolve_path(path: Union[str, Path], relative_to: Union[str, Path, None] = None) -> Path:
+def resolve_path(
+    path: Union[str, Path], relative_to: Union[str, Path, None] = None
+) -> Path:
     """
     Resolve a path, handling user home directory and relative paths.
-    
+
     Args:
         path: Path to resolve
         relative_to: Base path for relative paths (defaults to project root)
-        
+
     Returns:
         Resolved absolute path
     """
     path = Path(path)
-    
+
     # If absolute, return as-is
     if path.is_absolute():
         return path
-    
+
     # Expand user home directory
     if str(path).startswith("~"):
         return path.expanduser()
-    
+
     # Make relative to project root or specified base
     if relative_to is None:
         relative_to = get_project_root()
     else:
         relative_to = Path(relative_to)
-    
+
     return (relative_to / path).resolve()
 
 
@@ -114,7 +116,9 @@ def save_config(config: Dict[str, Any], save_path: Union[str, Path]) -> None:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 
-def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+def merge_configs(
+    base_config: Dict[str, Any], override_config: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Merge two configurations, with override_config taking precedence.
 

@@ -1,7 +1,8 @@
 """Wolfram Alpha API integration for symbolic computation and knowledge injection."""
 
-import wolframalpha
 from typing import Any, Dict, Optional, cast
+
+import wolframalpha
 
 from .base import APIIntegration, APIResponse, KnowledgeInjector
 
@@ -14,8 +15,8 @@ class WolframAlphaIntegration(APIIntegration):
         self.client = wolframalpha.Client(api_key)
 
         # Wolfram-specific config
-        self.max_queries_per_day = config.get('max_queries_per_day', 2000)
-        self.cache_dir = config.get('cache_dir', './cache/wolfram')
+        self.max_queries_per_day = config.get("max_queries_per_day", 2000)
+        self.cache_dir = config.get("cache_dir", "./cache/wolfram")
 
         # Query tracking (in production, this would be persistent)
         self.daily_queries = 0
@@ -34,9 +35,7 @@ class WolframAlphaIntegration(APIIntegration):
             # Check daily limit
             if self.daily_queries >= self.max_queries_per_day:
                 return APIResponse(
-                    success=False,
-                    data=None,
-                    error="Daily query limit exceeded"
+                    success=False, data=None, error="Daily query limit exceeded"
                 )
 
             # Make the query
@@ -51,23 +50,19 @@ class WolframAlphaIntegration(APIIntegration):
                     success=False,
                     data=None,
                     error="Wolfram Alpha query failed",
-                    metadata={"query": prompt}
+                    metadata={"query": prompt},
                 )
 
             # Extract pod data
             pods_data = []
             for pod in result.pods:
-                pod_info = {
-                    "title": pod.title,
-                    "id": pod.id,
-                    "subpods": []
-                }
+                pod_info = {"title": pod.title, "id": pod.id, "subpods": []}
 
                 for subpod in pod.subpods:
                     subpod_info = {
                         "title": subpod.title,
                         "plaintext": subpod.plaintext,
-                        "img": subpod.img.src if subpod.img else None
+                        "img": subpod.img.src if subpod.img else None,
                     }
                     pod_info["subpods"].append(subpod_info)
 
@@ -79,8 +74,8 @@ class WolframAlphaIntegration(APIIntegration):
                 metadata={
                     "query": prompt,
                     "num_pods": len(pods_data),
-                    "query_count": self.daily_queries
-                }
+                    "query_count": self.daily_queries,
+                },
             )
 
         except Exception as e:  # pylint: disable=broad-except
@@ -89,7 +84,7 @@ class WolframAlphaIntegration(APIIntegration):
                 success=False,
                 data=None,
                 error=f"Wolfram Alpha API error: {str(e)}",
-                metadata={"query": prompt}
+                metadata={"query": prompt},
             )
 
     def validate_response(self, response: APIResponse) -> bool:
@@ -152,7 +147,9 @@ class WolframAlphaIntegration(APIIntegration):
 class WolframKnowledgeInjector(KnowledgeInjector):
     """Knowledge injector using Wolfram Alpha for mathematical validation."""
 
-    def __init__(self, api_integration: WolframAlphaIntegration, config: Dict[str, Any]):
+    def __init__(
+        self, api_integration: WolframAlphaIntegration, config: Dict[str, Any]
+    ):
         super().__init__(api_integration, config)
         self.wolfram = api_integration
 
@@ -170,10 +167,7 @@ class WolframKnowledgeInjector(KnowledgeInjector):
         math_expressions = self._extract_math_expressions(input_data)
 
         if not math_expressions:
-            return {
-                "injected": False,
-                "reason": "No mathematical expressions found"
-            }
+            return {"injected": False, "reason": "No mathematical expressions found"}
 
         # Query Wolfram for validation
         validations = []
@@ -181,17 +175,19 @@ class WolframKnowledgeInjector(KnowledgeInjector):
             response = self.wolfram.query(f"validate {expr}")
             if response.success:
                 result = self.wolfram.extract_mathematical_result(response)
-                validations.append({
-                    "expression": expr,
-                    "wolfram_result": result,
-                    "confidence": 0.9 if result else 0.5
-                })
+                validations.append(
+                    {
+                        "expression": expr,
+                        "wolfram_result": result,
+                        "confidence": 0.9 if result else 0.5,
+                    }
+                )
 
         return {
             "injected": len(validations) > 0,
             "validations": validations,
             "injection_type": "mathematical_validation",
-            "weight": self.injection_weight
+            "weight": self.injection_weight,
         }
 
     def _extract_math_expressions(self, input_data: Any) -> list[str]:
@@ -208,21 +204,24 @@ class WolframKnowledgeInjector(KnowledgeInjector):
 
         if isinstance(input_data, str):
             # Look for common math patterns
+            # Break long regex patterns across multiple physical lines to
+            # keep source line lengths within style limits.
             patterns = [
-                r'\d+\s*[\+\-\*\/]\s*\d+',  # Basic arithmetic (e.g., 3*4, 5-2)
-                r'\d+\s*\^\s*\d+',             # Numeric exponents (e.g., 2^3)
-                r'[A-Za-z][A-Za-z0-9_]*\s*\^\s*\d+\s*=\s*\d+',  # Variable exponent equations (e.g., x^2 = 4)
-                r'sqrt\(\d+\)',                  # Square roots (e.g., sqrt(16))
-                r'\d+\s*=\s*\d+',               # Numeric equations (e.g., 2 = 4)
+                r"\d+\s*[\+\-\*\/]\s*\d+",  # Basic arithmetic (e.g., 3*4, 5-2)
+                r"\d+\s*\^\s*\d+",  # Numeric exponents (e.g., 2^3)
+                # Variable exponent equations (e.g., x^2 = 4)
+                r"[A-Za-z][A-Za-z0-9_]" r"*\s*\^\s*\d+\s*=\s*\d+",
+                r"sqrt\(\d+\)",  # Square roots (e.g., sqrt(16))
+                r"\d+\s*=\s*\d+",  # Numeric equations (e.g., 2 = 4)
             ]
 
             expressions: list[str] = []
             seen: set[str] = set()
-            # Preserve input order by iterating with finditer across patterns in sequence
+            # Preserve input order by iterating with finditer across patterns
             for pattern in patterns:
                 for m in re.finditer(pattern, input_data):
                     expr = m.group(0)
-                    # Skip if this expr is a substring of any previously captured expression
+                    # Skip if expr is substring of an earlier captured expression
                     if any(expr in prev for prev in expressions):
                         continue
                     if expr not in seen:
