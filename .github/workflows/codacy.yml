@@ -1,0 +1,35 @@
+name: Codacy Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  codacy-analysis:
+    # Only run Codacy when the project token secret is provided
+    if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Codacy CLI (bootstrap)
+        run: |
+          chmod +x ./.codacy/cli.sh || true
+          ./.codacy/cli.sh download
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Codacy analysis (local bootstrap)
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . || true
