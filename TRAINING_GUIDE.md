@@ -46,7 +46,7 @@ Run inference on new data:
 ```bash
 python inference.py \
   --config configs/default.yaml \
-  --checkpoint checkpoints/best.pt \
+  --checkpoint checkpoints/best.safetensors \
   --image path/to/image.jpg \
   --text "Optional text description"
 ```
@@ -657,12 +657,13 @@ python train.py \
 ```python
 from src.models import create_multi_modal_model
 from src.utils.config import load_config
-import torch
+from src.utils.safe_load import safe_load_checkpoint
 
 config = load_config("configs/default.yaml")
 model = create_multi_modal_model(config)
 
-checkpoint = torch.load("checkpoints/best.pt")
+# Prefer loading a safetensors `model_state_dict` when available
+checkpoint = safe_load_checkpoint("checkpoints/best.safetensors", map_location="cpu", expected_keys={"model_state_dict"})
 model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 ```

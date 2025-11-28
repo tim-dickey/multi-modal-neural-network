@@ -585,6 +585,17 @@ class Trainer:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         latest_path = self.checkpoint_dir / "latest.pt"
         torch.save(checkpoint, latest_path)
+        # Also save model_state_dict as a safetensors file for safer loading
+        try:
+            from safetensors.torch import save_file as _st_save
+
+            safetensors_path = latest_path.with_suffix(".safetensors")
+            # save_file expects a mapping of name -> tensor
+            _st_save(checkpoint["model_state_dict"], str(safetensors_path))
+            self.logger.info(f"Also saved model_state_dict to {safetensors_path}")
+        except Exception:
+            # If safetensors is not available or save fails, continue silently
+            self.logger.debug("safetensors save skipped or failed; leaving .pt only")
         if is_best:
             best_path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)

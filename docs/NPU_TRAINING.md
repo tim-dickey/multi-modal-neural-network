@@ -539,7 +539,10 @@ from src.utils.config import load_config
 # 1. Load trained model
 config = load_config("configs/default.yaml")
 model = create_model(config)
-model.load_state_dict(torch.load("checkpoints/best_model.pth"))
+   # Prefer loading safetensors model weights when available
+   from src.utils.safe_load import safe_load_checkpoint
+   checkpoint = safe_load_checkpoint("checkpoints/best_model.safetensors", map_location="cpu", expected_keys={"model_state_dict"})
+   model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 
 # 2. Export to ONNX
