@@ -52,13 +52,38 @@ jobs:
           echo "pwd: $(pwd)" >> codacy-diag.txt
           echo "ls -la (repo root):" >> codacy-diag.txt
           ls -la >> codacy-diag.txt 2>&1 || true
-          echo "ls -la .codacy-cli-v2:" >> codacy-diag.txt
-          ls -la .codacy-cli-v2 >> codacy-diag.txt 2>&1 || true
-          echo "find .codacy-cli-v2 -maxdepth 2 -type f -exec ls -la {} \;" >> codacy-diag.txt
-          find .codacy-cli-v2 -maxdepth 2 -type f -exec ls -la {} \; >> codacy-diag.txt 2>&1 || true
-          echo "--- running with shell trace (bash -x) ---" >> codacy-diag.txt
-          # Run the analyze command with verbose shell tracing and capture everything
-          bash -x ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+
+          # Ensure the bootstrap is executable and download the CLI into the cache
+          chmod +x ./.codacy/cli.sh || true
+          echo "--- running bootstrap download (bash -x) ---" >> codacy-diag.txt
+          bash -x ./.codacy/cli.sh download >> codacy-diag.txt 2>&1 || true
+
+          # Locate the extracted binary in the cache
+          cache="$HOME/.cache/codacy/codacy-cli-v2"
+          version="$(awk -F'"' '/version:/ {print $2; exit}' "$cache/version.yaml" 2>/dev/null || true)"
+          BIN=""
+          if [ -n "$version" ] && [ -f "$cache/$version/codacy-cli-v2" ]; then
+            BIN="$cache/$version/codacy-cli-v2"
+          else
+            BIN="$(find "$cache" -maxdepth 3 -type f -name codacy-cli-v2 | head -n1 || true)"
+          fi
+
+          echo "Binary candidate: $BIN" >> codacy-diag.txt
+          if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
+            echo "Binary not found; listing cache:" >> codacy-diag.txt
+            ls -la "$cache" >> codacy-diag.txt 2>&1 || true
+            echo "Binary not found; failing" >> codacy-diag.txt
+            exit 1
+          fi
+
+          ls -la "$BIN" >> codacy-diag.txt 2>&1 || true
+          stat "$BIN" >> codacy-diag.txt 2>&1 || true
+          chmod +x "$BIN" || true
+
+          echo "--- executing extracted binary directly ---" >> codacy-diag.txt
+          # Execute the extracted binary directly; quote the token to avoid shell interpretation
+          "$BIN" analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+
           # Append diagnostics to the log bundle
           echo "\n--- CONTENTS OF codacy-diag.txt ---" >> codacy-cli.log
           cat codacy-diag.txt >> codacy-cli.log || true
