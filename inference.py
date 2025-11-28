@@ -28,7 +28,11 @@ def load_model(config_path: str, checkpoint_path: str, device: str = "cuda"):
     config = load_config(config_path)
     model = create_multi_modal_model(config)
 
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    from src.utils.safe_load import safe_load_checkpoint
+
+    checkpoint = safe_load_checkpoint(
+        checkpoint_path, map_location=device, expected_keys={"model_state_dict"}
+    )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()

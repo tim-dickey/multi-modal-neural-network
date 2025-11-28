@@ -594,7 +594,21 @@ class Trainer:
         """Load model from checkpoint."""
         self.logger.info(f"Loading checkpoint from {checkpoint_path}")
 
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        from ..utils.safe_load import safe_load_checkpoint
+
+        checkpoint = safe_load_checkpoint(
+            checkpoint_path,
+            map_location=self.device,
+            expected_keys={
+                "model_state_dict",
+                "optimizer_state_dict",
+                "scheduler_state_dict",
+                "epoch",
+                "global_step",
+                "best_val_loss",
+                "config",
+            },
+        )
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
