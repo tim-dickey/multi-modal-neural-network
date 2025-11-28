@@ -19,7 +19,7 @@ def _looks_like_state_dict(obj: Any) -> bool:
     return all(isinstance(k, str) for k in obj.keys())
 
 
-def safe_load_checkpoint(
+def safe_load_checkpoint(  # noqa: C901
     path: str,
     *,
     map_location: Optional[object] = None,
@@ -60,7 +60,10 @@ def safe_load_checkpoint(
     except Exception:
         resolved = p
 
-    if not allow_external and not any(str(resolved).startswith(str(tr)) for tr in trusted_roots):
+    # Restrict loading to trusted roots unless allow_external is set.
+    if not allow_external and not any(
+        str(resolved).startswith(str(tr)) for tr in trusted_roots
+    ):
         raise ValueError(
             "Loading checkpoints from external/untrusted paths is disabled by default; "
             "set allow_external=True to override when necessary."
@@ -71,17 +74,21 @@ def safe_load_checkpoint(
         try:
             from safetensors.torch import load_file as _st_load
 
-            data = _st_load(path, device=map_location if map_location is not None else "cpu")
+            device_arg = map_location if map_location is not None else "cpu"
+            data = _st_load(path, device=device_arg)
             # safetensors loaders return a mapping of tensors; normalize to dict
             if not isinstance(data, dict):
                 raise ValueError("safetensors loader returned unexpected type")
             # Convert to CPU-backed tensors if map_location provided
             if map_location is not None:
-                device = map_location if isinstance(map_location, torch.device) else map_location
+                if isinstance(map_location, torch.device):
+                    device = map_location
+                else:
+                    device = map_location
                 data = {k: v.to(device) for k, v in data.items()}
             return dict(data)
         except Exception as exc:  # pragma: no cover - defensive
-            raise ValueError(f"Failed to load safetensors checkpoint {path}: {exc}") from exc
+            raise ValueError(f"Failed to load safetensors {path}: {exc}") from exc
 
     # Fallback to torch.load for normal .pt/.pth files
     try:

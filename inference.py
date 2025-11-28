@@ -14,7 +14,13 @@ from torchvision import transforms
 # side-effects when running linters or importing this module.
 
 
-def load_model(config_path: str, checkpoint_path: str, device: str = "cuda", *, allow_external: bool = False):
+def load_model(
+    config_path: str,
+    checkpoint_path: str,
+    device: str = "cuda",
+    *,
+    allow_external: bool = False,
+):
     """Load trained model from checkpoint."""
     # Ensure `src` is importable when this script is executed as a script
     import sys as _sys
@@ -97,7 +103,10 @@ def main():
     # Load model
     print(f"Loading model from {args.checkpoint}...")
     model, config = load_model(
-        args.config, args.checkpoint, args.device, allow_external=args.allow_external_checkpoint
+        args.config,
+        args.checkpoint,
+        args.device,
+        allow_external=args.allow_external_checkpoint,
     )
 
     # Preprocess inputs
