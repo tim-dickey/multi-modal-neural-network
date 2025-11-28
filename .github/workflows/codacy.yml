@@ -11,12 +11,19 @@ on:
 
 jobs:
   codacy-analysis:
-    # Only run Codacy when the project token secret is provided
-    if: ${{ secrets.CODACY_PROJECT_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check for Codacy token
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          if [ -z "${CODACY_PROJECT_TOKEN:-}" ]; then
+            echo "CODACY_PROJECT_TOKEN not set; skipping Codacy analysis"
+            exit 0
+          fi
 
       - name: Download Codacy CLI (bootstrap)
         run: |
