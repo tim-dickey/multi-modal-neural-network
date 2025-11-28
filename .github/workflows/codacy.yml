@@ -79,15 +79,30 @@ jobs:
           ls -la "$BIN" >> codacy-diag.txt 2>&1 || true
           stat "$BIN" >> codacy-diag.txt 2>&1 || true
           chmod +x "$BIN" || true
-
           echo "--- executing extracted binary directly ---" >> codacy-diag.txt
+          # Use bash pipefail so we can propagate the CLI exit code through the pipeline
+          set -o pipefail
+
+          # Capture version and help for diagnostics (harmless if the binary changes)
+          "$BIN" --version > codacy-version.txt 2>&1 || true
+          "$BIN" analyze --help > codacy-analyze-help.txt 2>&1 || true
+
           # Execute the extracted binary directly; quote the token to avoid shell interpretation
           # Use the CLI's --api-token flag (the binary does not accept --project-token)
           "$BIN" analyze --api-token "$CODACY_PROJECT_TOKEN" 2>&1 | tee codacy-cli.log
 
+          # Capture the CLI's exit code (bash-specific PIPESTATUS) and fail the step if non-zero
+          rc=${PIPESTATUS[0]:-0}
+          echo "EXIT_CODE=$rc" >> codacy-cli.log
+
           # Append diagnostics to the log bundle
           echo "\n--- CONTENTS OF codacy-diag.txt ---" >> codacy-cli.log
           cat codacy-diag.txt >> codacy-cli.log || true
+
+          if [ "$rc" -ne 0 ]; then
+            echo "Codacy CLI exited with code $rc; failing job" >> codacy-cli.log
+            exit $rc
+          fi
 
       - name: Upload Codacy CLI output
         if: always()
@@ -97,5 +112,7 @@ jobs:
           path: |
             codacy-cli.log
             codacy-diag.txt
+              codacy-version.txt
+              codacy-analyze-help.txt
             .codacy-cli-v2
             .codacy
