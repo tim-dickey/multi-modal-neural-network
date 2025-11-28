@@ -18,7 +18,7 @@ def test_safe_subprocess_run_success(monkeypatch):
 
     completed = subprocess.CompletedProcess(args=["/usr/bin/fakecmd"], returncode=0, stdout="ok\n")
 
-    def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False):
+    def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False, cwd=None, **kwargs):
         return completed
 
     monkeypatch.setattr("subprocess.run", fake_run)
@@ -33,7 +33,7 @@ def test_safe_subprocess_run_timeout(monkeypatch):
     # Simulate a timeout being raised by subprocess.run
     monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/fakecmd")
 
-    def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False):
+    def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False, cwd=None, **kwargs):
         raise subprocess.TimeoutExpired(cmd, timeout)
 
     monkeypatch.setattr("subprocess.run", fake_run)

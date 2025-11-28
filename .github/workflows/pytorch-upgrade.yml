@@ -45,3 +45,45 @@ jobs:
           path: |
             .pytest_cache
             pytest.log || true
+
+  # GPU smoke job (runs on a self-hosted GPU runner labeled 'gpu')
+  gpu-smoke:
+    runs-on: [self-hosted, gpu]
+    needs: smoke-test
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Upgrade pip & install utilities
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit || true
+
+      - name: Download Torch wheels (no install)
+        run: |
+          mkdir -p /tmp/wheels
+          python -m pip download "torch==2.6.2" "torchvision==0.16.2" --no-deps -d /tmp/wheels || true
+          ls -lah /tmp/wheels || true
+
+      - name: Inspect wheel contents for native libs
+        run: |
+          set -e
+          for f in /tmp/wheels/*whl; do
+            echo "---- $f ----"
+            unzip -l "$f" | head -n 40 || true
+            # Search for possible bundled native libs known to be sensitive (e.g., libuv, tensorpipe)
+            unzip -p "$f" RECORD | sed -n '1,200p' || true
+            strings "$f" | egrep -i "libuv|tensorpipe|uv_|libcurel|libssl|libcrypto" || true
+          done
+
+      - name: (Optional) Run pip-audit against downloaded wheels
+        run: |
+          python -m pip install /tmp/wheels/*.whl --no-deps --ignore-installed -U --target /tmp/installed || true
+          pip-audit --path /tmp/installed --format json > torch-pip-audit.json || true
+          cat torch-pip-audit.json || true
