@@ -29,6 +29,14 @@ jobs:
         run: |
           chmod +x ./.codacy/cli.sh || true
           bash ./.codacy/cli.sh download
+          echo "--- DIAG: post-download (cwd=$(pwd)) ---" > codacy-diag.txt
+          echo "pwd: $(pwd)" >> codacy-diag.txt
+          echo "ls -la .codacy-cli-v2:" >> codacy-diag.txt
+          ls -la .codacy-cli-v2 >> codacy-diag.txt 2>&1 || true
+          echo "ls -la .codacy:" >> codacy-diag.txt
+          ls -la .codacy >> codacy-diag.txt 2>&1 || true
+          echo "ls -la ~/.cache/codacy (if present):" >> codacy-diag.txt
+          ls -la ~/.cache/codacy >> codacy-diag.txt 2>&1 || true
 
       - name: Install Python dependencies
         run: |
@@ -39,8 +47,21 @@ jobs:
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
-          # Capture stdout/stderr to a log file for later inspection
-          bash ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+          echo "--- DIAG: before analyze (cwd=$(pwd)) ---" >> codacy-diag.txt
+          echo "whoami: $(whoami)" >> codacy-diag.txt
+          echo "pwd: $(pwd)" >> codacy-diag.txt
+          echo "ls -la (repo root):" >> codacy-diag.txt
+          ls -la >> codacy-diag.txt 2>&1 || true
+          echo "ls -la .codacy-cli-v2:" >> codacy-diag.txt
+          ls -la .codacy-cli-v2 >> codacy-diag.txt 2>&1 || true
+          echo "find .codacy-cli-v2 -maxdepth 2 -type f -exec ls -la {} \;" >> codacy-diag.txt
+          find .codacy-cli-v2 -maxdepth 2 -type f -exec ls -la {} \; >> codacy-diag.txt 2>&1 || true
+          echo "--- running with shell trace (bash -x) ---" >> codacy-diag.txt
+          # Run the analyze command with verbose shell tracing and capture everything
+          bash -x ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . 2>&1 | tee codacy-cli.log
+          # Append diagnostics to the log bundle
+          echo "\n--- CONTENTS OF codacy-diag.txt ---" >> codacy-cli.log
+          cat codacy-diag.txt >> codacy-cli.log || true
 
       - name: Upload Codacy CLI output
         if: always()
@@ -49,5 +70,6 @@ jobs:
           name: codacy-cli-output
           path: |
             codacy-cli.log
+            codacy-diag.txt
             .codacy-cli-v2
             .codacy
