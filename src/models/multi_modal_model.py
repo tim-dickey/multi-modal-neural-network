@@ -178,7 +178,7 @@ class MultiModalModel(nn.Module):
         )
 
         if self.fusion_type == "early":
-            fused_features, vision_seq_len = self.fusion_layer(
+            fused_features, _ = self.fusion_layer(
                 vision_features=vision_features,
                 text_features=text_features,
                 text_mask=attention_mask,
