@@ -83,13 +83,16 @@ jobs:
           # Use bash pipefail so we can propagate the CLI exit code through the pipeline
           set -o pipefail
 
-          # Capture version and help for diagnostics (harmless if the binary changes)
-          "$BIN" --version > codacy-version.txt 2>&1 || true
+          # Capture version and help for diagnostics (use the correct subcommand)
+          "$BIN" version > codacy-version.txt 2>&1 || true
           "$BIN" analyze --help > codacy-analyze-help.txt 2>&1 || true
 
           # Execute the extracted binary directly; quote the token to avoid shell interpretation
-          # Use the CLI's --api-token flag (the binary does not accept --project-token)
-          "$BIN" analyze --api-token "$CODACY_PROJECT_TOKEN" 2>&1 | tee codacy-cli.log
+          # Use the CLI's --api-token flag (the binary does not accept --project-token).
+          # Provide organization/provider/repository so the CLI can fetch remote configuration
+          # when an API token is supplied.
+          "$BIN" analyze --api-token "$CODACY_PROJECT_TOKEN" \
+            --organization "tim-dickey" --provider "gh" --repository "multi-modal-neural-network" 2>&1 | tee codacy-cli.log
 
           # Capture the CLI's exit code (bash-specific PIPESTATUS) and fail the step if non-zero
           rc=${PIPESTATUS[0]:-0}
