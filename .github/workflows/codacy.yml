@@ -28,7 +28,7 @@ jobs:
       - name: Download Codacy CLI (bootstrap)
         run: |
           chmod +x ./.codacy/cli.sh || true
-          ./.codacy/cli.sh download
+          bash ./.codacy/cli.sh download
 
       - name: Install Python dependencies
         run: |
@@ -39,4 +39,4 @@ jobs:
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
-          ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . || true
+          bash ./.codacy/cli.sh analyze --project-token "$CODACY_PROJECT_TOKEN" --directory . || true
