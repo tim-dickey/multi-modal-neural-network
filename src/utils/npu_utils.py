@@ -32,14 +32,22 @@ def _safe_run(
     return subprocess.run(cmd, timeout=timeout, check=False, **kwargs)
 
 
-def _run_powershell_pnp_probe(cmd_body: str) -> subprocess.CompletedProcess:
+def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> subprocess.CompletedProcess:
     """Run a PowerShell PnP device probe command via :func:`_safe_run`.
 
     The function accepts the body of the PowerShell command (the part after
-    ``-Command``) and wraps it in a safe subprocess call. This consolidates
-    repeated PowerShell probing logic used across different detection helpers.
+    ``-Command``) and wraps it in a safe subprocess call. Callers may pass
+    an optional `args` list which will be forwarded to PowerShell via the
+    `-ArgumentList` parameter. This avoids embedding untrusted input directly
+    into the command string and reduces risk of command injection.
     """
-    cmd = ["powershell", "-Command", cmd_body]
+    # Build the command list; prefer explicit argument lists to avoid shell
+    # interpolation of user-supplied values.
+    if args:
+        cmd = ["powershell", "-Command", cmd_body, "-ArgumentList", *args]
+    else:
+        cmd = ["powershell", "-Command", cmd_body]
+
     return _safe_run(cmd, capture_output=True, text=True)
 
 

@@ -78,8 +78,8 @@ jobs:
 
           # Ensure the bootstrap is executable and download the CLI into the cache
           chmod +x ./.codacy/cli.sh || true
-          echo "--- running bootstrap download (bash -x) ---" >> codacy-diag.txt
-          bash -x ./.codacy/cli.sh download >> codacy-diag.txt 2>&1 || true
+          echo "--- running bootstrap download ---" >> codacy-diag.txt
+          bash ./.codacy/cli.sh download >> codacy-diag.txt 2>&1 || true
 
           # Locate the extracted binary in the cache
           cache="$HOME/.cache/codacy/codacy-cli-v2"
@@ -130,15 +130,42 @@ jobs:
             exit $rc
           fi
 
+      - name: Sanitize Codacy logs
+        if: always()
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          # Create a redacted copy of the CLI log to avoid leaking secrets in artifacts
+          if [ -f codacy-cli.log ]; then
+            python - <<'PY'
+            import os
+            tok = os.environ.get('CODACY_PROJECT_TOKEN','')
+            try:
+              with open('codacy-cli.log','r',encoding='utf-8',errors='ignore') as f:
+                data = f.read()
+              if tok:
+                data = data.replace(tok, '[REDACTED]')
+              with open('codacy-cli.log.redacted','w',encoding='utf-8') as f:
+                f.write(data)
+              print('WROTE codacy-cli.log.redacted')
+            except Exception as e:
+              print('redaction-failed', e)
+              open('codacy-cli.log.redacted','w').close()
+            PY
+          else
+            # Ensure the file exists so the uploader doesn't fail
+            touch codacy-cli.log.redacted || true
+          fi
+
       - name: Upload Codacy CLI output
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: codacy-cli-output
           path: |
-            codacy-cli.log
+            codacy-cli.log.redacted
             codacy-diag.txt
-              codacy-version.txt
-              codacy-analyze-help.txt
+            codacy-version.txt
+            codacy-analyze-help.txt
             .codacy-cli-v2
             .codacy
