@@ -41,12 +41,18 @@ def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> s
     `-ArgumentList` parameter. This avoids embedding untrusted input directly
     into the command string and reduces risk of command injection.
     """
-    # Build the command list; prefer explicit argument lists to avoid shell
-    # interpolation of user-supplied values.
+    # Avoid running PowerShell if it's not present on the system.
+    if not shutil.which("powershell"):
+        raise OSError("PowerShell is not available on this system")
+
+    # Build a static command list and pass arguments via -ArgumentList to
+    # avoid shell interpolation. Use -NoProfile and -NonInteractive for
+    # a safer non-interactive invocation.
+    base = ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd_body]
     if args:
-        cmd = ["powershell", "-Command", cmd_body, "-ArgumentList", *args]
+        cmd = [*base, "-ArgumentList", *args]
     else:
-        cmd = ["powershell", "-Command", cmd_body]
+        cmd = base
 
     return _safe_run(cmd, capture_output=True, text=True)
 

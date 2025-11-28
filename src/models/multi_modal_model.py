@@ -178,7 +178,7 @@ class MultiModalModel(nn.Module):
         )
 
         if self.fusion_type == "early":
-            fused_features, vision_seq_len = self.fusion_layer(
+            fused_features, _ = self.fusion_layer(
                 vision_features=vision_features,
                 text_features=text_features,
                 text_mask=attention_mask,
@@ -342,6 +342,7 @@ def load_pretrained_weights(
     text_checkpoint: Optional[str] = None,
     *,
     strict: bool = False,
+    allow_external: bool = False,
 ) -> MultiModalModel:
     """
     Load pretrained weights for encoders.
@@ -356,12 +357,26 @@ def load_pretrained_weights(
         Model with loaded weights
     """
     if vision_checkpoint is not None:
-        vision_state = torch.load(vision_checkpoint, map_location="cpu")
+        from ..utils.safe_load import safe_load_checkpoint
+
+        vision_state = safe_load_checkpoint(
+            vision_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
+        )
+        # If the checkpoint is a wrapper dict (contains model_state_dict),
+        # accept that as well for backward compatibility.
+        if "model_state_dict" in vision_state:
+            vision_state = vision_state["model_state_dict"]
         model.vision_encoder.load_state_dict(vision_state, strict=strict)
         print(f"Loaded vision encoder from {vision_checkpoint}")
 
     if text_checkpoint is not None:
-        text_state = torch.load(text_checkpoint, map_location="cpu")
+        from ..utils.safe_load import safe_load_checkpoint
+
+        text_state = safe_load_checkpoint(
+            text_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
+        )
+        if "model_state_dict" in text_state:
+            text_state = text_state["model_state_dict"]
         model.text_encoder.load_state_dict(text_state, strict=strict)
         print(f"Loaded text encoder from {text_checkpoint}")
 

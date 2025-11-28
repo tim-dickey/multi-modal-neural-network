@@ -585,6 +585,17 @@ class Trainer:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         latest_path = self.checkpoint_dir / "latest.pt"
         torch.save(checkpoint, latest_path)
+        # Also save model_state_dict as a safetensors file for safer loading
+        try:
+            from safetensors.torch import save_file as _st_save
+
+            safetensors_path = latest_path.with_suffix(".safetensors")
+            # save_file expects a mapping of name -> tensor
+            _st_save(checkpoint["model_state_dict"], str(safetensors_path))
+            self.logger.info(f"Also saved model_state_dict to {safetensors_path}")
+        except Exception:
+            # If safetensors is not available or save fails, continue silently
+            self.logger.debug("safetensors save skipped or failed; leaving .pt only")
         if is_best:
             best_path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
@@ -594,7 +605,26 @@ class Trainer:
         """Load model from checkpoint."""
         self.logger.info(f"Loading checkpoint from {checkpoint_path}")
 
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        from ..utils.safe_load import safe_load_checkpoint
+        # Allow callers to opt-in to loading from external paths via config
+        allow_external = self.config.get("security", {}).get(
+            "allow_external_checkpoints", False
+        )
+
+        checkpoint = safe_load_checkpoint(
+            checkpoint_path,
+            map_location=self.device,
+            expected_keys={
+                "model_state_dict",
+                "optimizer_state_dict",
+                "scheduler_state_dict",
+                "epoch",
+                "global_step",
+                "best_val_loss",
+                "config",
+            },
+            allow_external=allow_external,
+        )
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
