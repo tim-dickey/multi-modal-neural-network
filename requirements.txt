@@ -1,7 +1,7 @@
 # Core ML
 torch>=2.6.0,<3
 torchvision>=0.16.0
-transformers==4.57.3
+transformers>=4.57.3,<5
 datasets>=2.14.0
 webdataset>=0.2.0
 pycocotools>=2.0.0
@@ -37,6 +37,8 @@ scipy>=1.11.0
 scikit-learn>=1.5.0
 tqdm>=4.66.3
 requests>=2.32.4
+# Prefer safetensors for safer checkpoint serialization
+safetensors>=0.4.0
 # Future API integrations
 openai>=1.0.0
 google-generativeai>=0.3.0
