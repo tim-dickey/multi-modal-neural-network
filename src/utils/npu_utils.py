@@ -32,10 +32,7 @@ def _safe_run(
     return subprocess.run(cmd, timeout=timeout, check=False, **kwargs)
 
 
-def _run_powershell_pnp_probe(
-    cmd_body: str,
-    args: list[str] | None = None,
-) -> subprocess.CompletedProcess:
+def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> subprocess.CompletedProcess:
     """Run a PowerShell PnP device probe command via :func:`_safe_run`.
 
     The function accepts the body of the PowerShell command (the part after

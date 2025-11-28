@@ -1,0 +1,144 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "multi_modal_model.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 140
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method forward has 97 lines of code (limit is 50)"
+          },
+          "ruleId": "Lizard_nloc-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "multi_modal_model.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 140
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method forward has a cyclomatic complexity of 13 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "multi_modal_model.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 140
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method forward has 10 parameters (limit is 8)"
+          },
+          "ruleId": "Lizard_parameter-count-medium"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/terryyin/lizard",
+          "name": "Lizard",
+          "rules": null,
+          "version": "1.17.10"
+        }
+      }
+    },
+    {
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/mnt/c/Users/tdick/OneDrive/Documents/GitHub/multi-modal-neural-network/src/models/multi_modal_model.py"
+                },
+                "region": {
+                  "startColumn": 28,
+                  "startLine": 181
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Unused variable 'vision_seq_len'"
+          },
+          "ruleId": "unused-variable"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://pylint.org",
+          "name": "Pylint",
+          "rules": null,
+          "version": "3.3.6"
+        }
+      }
+    },
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [],
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "rules": null,
+          "semanticVersion": "1.78.0"
+        }
+      }
+    },
+    {
+      "columnKind": "utf16CodeUnits",
+      "originalUriBaseIds": {
+        "ROOTPATH": {
+          "uri": "file:///mnt/c/Users/tdick/OneDrive/Documents/GitHub/multi-modal-neural-network/src/models/multi_modal_model.py/"
+        }
+      },
+      "results": [],
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "name": "Trivy",
+          "rules": null,
+          "version": "0.66.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

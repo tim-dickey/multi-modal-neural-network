@@ -96,21 +96,12 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str 
 
     # PowerShell script accepts a parameter ($name) and uses it in a -like
     # comparison. Passing via -ArgumentList avoids shell interpolation risks.
-    cmd_parts = [
-        "param($name); ",
-        "$gpu = Get-PnpDevice -Class Display | Where-Object { ",
-        "$_.FriendlyName -like \"*$name*\" } ",
-        "| Select-Object -First 1;",
-        " if ($gpu) { ",
-        " $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId ",
-        "-KeyName 'DEVPKEY_Device_Parent' | Select-Object -ExpandProperty Data;",
-        " $parentDevice = Get-PnpDevice -InstanceId $parent;",
-        " $busType = Get-PnpDeviceProperty -InstanceId $parent ",
-        "-KeyName 'DEVPKEY_Device_BusTypeGuid' -ErrorAction SilentlyContinue ",
-        "| Select-Object -ExpandProperty Data;",
-        " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }",
-    ]
-    cmd = "".join(cmd_parts)
+    cmd = (
+        "param($name); $gpu = Get-PnpDevice -Class Display | Where-Object { $_.FriendlyName -like \"*$name*\" } | Select-Object -First 1;"
+        " if ($gpu) { $parent = Get-PnpDeviceProperty -InstanceId $gpu.InstanceId -KeyName 'DEVPKEY_Device_Parent' | Select-Object -ExpandProperty Data;"
+        " $parentDevice = Get-PnpDevice -InstanceId $parent; $busType = Get-PnpDeviceProperty -InstanceId $parent -KeyName 'DEVPKEY_Device_BusTypeGuid' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Data;"
+        " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }"
+    )
 
     # Only run PowerShell if available
     if not shutil.which("powershell"):

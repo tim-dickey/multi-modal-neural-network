@@ -360,10 +360,7 @@ def load_pretrained_weights(
         from ..utils.safe_load import safe_load_checkpoint
 
         vision_state = safe_load_checkpoint(
-            vision_checkpoint,
-            map_location="cpu",
-            expected_keys=None,
-            allow_external=allow_external,
+            vision_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
         )
         # If the checkpoint is a wrapper dict (contains model_state_dict),
         # accept that as well for backward compatibility.
@@ -376,10 +373,7 @@ def load_pretrained_weights(
         from ..utils.safe_load import safe_load_checkpoint
 
         text_state = safe_load_checkpoint(
-            text_checkpoint,
-            map_location="cpu",
-            expected_keys=None,
-            allow_external=allow_external,
+            text_checkpoint, map_location="cpu", expected_keys=None, allow_external=allow_external
         )
         if "model_state_dict" in text_state:
             text_state = text_state["model_state_dict"]
