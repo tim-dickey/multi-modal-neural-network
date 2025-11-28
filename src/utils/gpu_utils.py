@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import re
 from typing import Any
+from .subprocess_utils import _safe_subprocess_run
 
 import torch
 
@@ -89,8 +90,8 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str 
     safe_fragment = ""
     try:
         first_token = gpu_name.split()[0] if gpu_name else ""
-        # Allow alphanumerics, space, underscore and hyphen only
-        safe_fragment = re.sub(r"[^A-Za-z0-9 _-]", "", first_token)
+        # Allow alphanumerics, space, underscore and hyphen only; limit length
+        safe_fragment = re.sub(r"[^A-Za-z0-9 _-]", "", first_token)[:64]
     except Exception:
         safe_fragment = ""
 
@@ -107,15 +108,15 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str 
     if not shutil.which("powershell"):
         return False, None
 
-    result = subprocess.run(
-        ["powershell", "-Command", cmd, "-ArgumentList", safe_fragment],
-        capture_output=True,
-        text=True,
-        timeout=5,
-        check=False,
-    )
+    result = _safe_subprocess_run([
+        "powershell",
+        "-Command",
+        cmd,
+        "-ArgumentList",
+        safe_fragment,
+    ], timeout=5)
 
-    if result.returncode == 0 and result.stdout.strip():
+    if result and result.returncode == 0 and result.stdout and result.stdout.strip():
         output = result.stdout.strip().lower()
         if "thunderbolt" in output or "usb4" in output:
             return True, "Thunderbolt"
@@ -132,10 +133,8 @@ def _detect_external_gpu_linux() -> tuple[bool, str | None]:
     if not shutil.which("lspci"):
         return False, None
 
-    result = subprocess.run(
-        ["lspci", "-vv"], capture_output=True, text=True, timeout=5, check=False
-    )
-    if result.returncode == 0:
+    result = _safe_subprocess_run(["lspci", "-vv"], timeout=5)
+    if result and result.returncode == 0:
         lines = result.stdout.split("\n")
         for i, line in enumerate(lines):
             if "VGA" in line or "Display" in line:
@@ -153,14 +152,11 @@ def _detect_external_gpu_darwin() -> tuple[bool, str | None]:
     if not shutil.which("system_profiler"):
         return False, None
 
-    result = subprocess.run(
+    result = _safe_subprocess_run(
         ["system_profiler", "SPThunderboltDataType", "SPDisplaysDataType"],
-        capture_output=True,
-        text=True,
         timeout=5,
-        check=False,
     )
-    if result.returncode == 0:
+    if result and result.returncode == 0:
         output = result.stdout.lower()
         if "egpu" in output or ("thunderbolt" in output and "display" in output):
             return True, "Thunderbolt"
@@ -173,15 +169,16 @@ def _query_nvidia_smi() -> list[str]:
         return []
 
     try:
-        result = subprocess.run(
-            ["nvidia-smi", "-L"], capture_output=True, text=True, timeout=3, check=False
-        )
-        if result.returncode == 0 and result.stdout.strip():
+        result = _safe_subprocess_run(["nvidia-smi", "-L"], timeout=3)
+        if result and result.returncode == 0 and result.stdout.strip():
             return [line.strip() for line in result.stdout.splitlines() if line.strip()]
     except subprocess.TimeoutExpired:
         # nvidia-smi timed out
         pass
     return []
+
+
+
 
 
 def _populate_nvidia_smi_info(info: dict[str, Any], parsed: list[str]) -> None:
