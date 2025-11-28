@@ -39,3 +39,20 @@ def test_safe_load_safetensors_roundtrip(tmp_path: Path):
     assert isinstance(loaded, dict)
     assert "weight" in loaded
     assert torch.allclose(loaded["weight"], td["weight"]) or loaded["weight"].shape == td["weight"].shape
+
+
+def test_allow_external_flag(tmp_path: Path):
+    # Create a checkpoint in the user's home directory (outside repo and tempdir)
+    home = Path.home()
+    external_dir = home / "mmnn_test_external"
+    external_dir.mkdir(parents=True, exist_ok=True)
+    external_ckpt = external_dir / "external.pt"
+    torch.save({"model_state_dict": {}}, str(external_ckpt))
+
+    # By default loading from external path should be rejected
+    with pytest.raises(ValueError):
+        safe_load_checkpoint(str(external_ckpt), map_location="cpu")
+
+    # When explicitly allowed, it should succeed
+    loaded = safe_load_checkpoint(str(external_ckpt), map_location="cpu", allow_external=True)
+    assert isinstance(loaded, dict)

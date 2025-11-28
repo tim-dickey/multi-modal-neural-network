@@ -606,6 +606,10 @@ class Trainer:
         self.logger.info(f"Loading checkpoint from {checkpoint_path}")
 
         from ..utils.safe_load import safe_load_checkpoint
+        # Allow callers to opt-in to loading from external paths via config
+        allow_external = self.config.get("security", {}).get(
+            "allow_external_checkpoints", False
+        )
 
         checkpoint = safe_load_checkpoint(
             checkpoint_path,
@@ -619,6 +623,7 @@ class Trainer:
                 "best_val_loss",
                 "config",
             },
+            allow_external=allow_external,
         )
 
         self.model.load_state_dict(checkpoint["model_state_dict"])

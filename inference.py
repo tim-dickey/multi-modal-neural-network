@@ -14,7 +14,7 @@ from torchvision import transforms
 # side-effects when running linters or importing this module.
 
 
-def load_model(config_path: str, checkpoint_path: str, device: str = "cuda"):
+def load_model(config_path: str, checkpoint_path: str, device: str = "cuda", *, allow_external: bool = False):
     """Load trained model from checkpoint."""
     # Ensure `src` is importable when this script is executed as a script
     import sys as _sys
@@ -31,7 +31,10 @@ def load_model(config_path: str, checkpoint_path: str, device: str = "cuda"):
     from src.utils.safe_load import safe_load_checkpoint
 
     checkpoint = safe_load_checkpoint(
-        checkpoint_path, map_location=device, expected_keys={"model_state_dict"}
+        checkpoint_path,
+        map_location=device,
+        expected_keys={"model_state_dict"},
+        allow_external=allow_external,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
@@ -83,12 +86,19 @@ def main():
     parser.add_argument("--image", type=str, required=True, help="Path to input image")
     parser.add_argument("--text", type=str, default="", help="Optional text input")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument(
+        "--allow-external-checkpoint",
+        action="store_true",
+        help="Allow loading checkpoints from external/untrusted paths (opt-in)",
+    )
 
     args = parser.parse_args()
 
     # Load model
     print(f"Loading model from {args.checkpoint}...")
-    model, config = load_model(args.config, args.checkpoint, args.device)
+    model, config = load_model(
+        args.config, args.checkpoint, args.device, allow_external=args.allow_external_checkpoint
+    )
 
     # Preprocess inputs
     print(f"Processing image: {args.image}")
