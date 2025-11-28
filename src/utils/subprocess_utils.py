@@ -14,7 +14,14 @@ import subprocess
 from typing import List, Optional
 
 
-def _safe_subprocess_run(cmd: List[str], timeout: int = 5, *, capture_output: bool = True, text: bool = True) -> Optional[subprocess.CompletedProcess]:
+def _safe_subprocess_run(
+    cmd: List[str],
+    timeout: int = 5,
+    *,
+    capture_output: bool = True,
+    text: bool = True,
+    cwd: Optional[str] = None,
+) -> Optional[subprocess.CompletedProcess]:
     """Run a command safely for probe-style use.
 
     - `cmd` must be a non-empty list (executable + args).
@@ -33,7 +40,14 @@ def _safe_subprocess_run(cmd: List[str], timeout: int = 5, *, capture_output: bo
     cmd = [exe, *cmd[1:]]
 
     try:
-        return subprocess.run(cmd, capture_output=capture_output, text=text, timeout=timeout, check=False)
+        return subprocess.run(
+            cmd,
+            capture_output=capture_output,
+            text=text,
+            timeout=timeout,
+            check=False,
+            cwd=cwd,
+        )
     except subprocess.TimeoutExpired:
         # Propagate timeouts so callers can handle them
         raise
