@@ -6,6 +6,8 @@ unpickling safe against malicious files, but it improves diagnostics
 and encourages using `safetensors` when available.
 """
 from typing import Optional, Set, Dict, Any
+from pathlib import Path
+import tempfile
 
 import torch
 
@@ -22,6 +24,7 @@ def safe_load_checkpoint(
     *,
     map_location: Optional[object] = None,
     expected_keys: Optional[Set[str]] = None,
+    allow_external: bool = False,
 ) -> Dict[str, Any]:
     """Load a checkpoint with basic validation and optional safetensors support.
 
@@ -37,6 +40,32 @@ def safe_load_checkpoint(
     Raises:
         ValueError: if loaded object is not a dict or missing expected keys.
     """
+    # Basic runtime guards: refuse obvious remote URLs and restrict loads
+    # to repository or system temporary directories unless explicitly
+    # allowed via `allow_external`.
+    p = Path(path)
+    lower = str(path).lower()
+    if lower.startswith("http://") or lower.startswith("https://"):
+        raise ValueError("Refuse to load checkpoint from remote URL")
+
+    # Resolve trusted roots: repository root (two parents up) and tempdir
+    try:
+        repo_root = Path(__file__).resolve().parents[2]
+    except Exception:
+        repo_root = Path.cwd()
+    trusted_roots = {repo_root.resolve(), Path(tempfile.gettempdir()).resolve()}
+
+    try:
+        resolved = p.resolve()
+    except Exception:
+        resolved = p
+
+    if not allow_external and not any(str(resolved).startswith(str(tr)) for tr in trusted_roots):
+        raise ValueError(
+            "Loading checkpoints from external/untrusted paths is disabled by default; "
+            "set allow_external=True to override when necessary."
+        )
+
     # Prefer safetensors loader for .safetensors files when available
     if str(path).endswith(".safetensors"):
         try:
