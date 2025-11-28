@@ -1,0 +1,203 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [],
+      "tool": {
+        "driver": {
+          "informationUri": "https://pylint.org",
+          "name": "Pylint",
+          "rules": null,
+          "version": "3.3.6"
+        }
+      }
+    },
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [],
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "rules": null,
+          "semanticVersion": "1.78.0"
+        }
+      }
+    },
+    {
+      "columnKind": "utf16CodeUnits",
+      "originalUriBaseIds": {
+        "ROOTPATH": {
+          "uri": "file:///mnt/c/Users/tdick/OneDrive/Documents/GitHub/multi-modal-neural-network/src/utils/npu_utils.py/"
+        }
+      },
+      "results": [],
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "name": "Trivy",
+          "rules": null,
+          "version": "0.66.0"
+        }
+      }
+    },
+    {
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 83
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method _detect_external_npu_windows has a cyclomatic complexity of 9 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 117
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method _detect_external_npu_linux has a cyclomatic complexity of 11 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 160
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method detect_npu_info has a cyclomatic complexity of 9 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 280
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method _detect_intel_npu has a cyclomatic complexity of 11 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 326
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method _detect_amd_npu has a cyclomatic complexity of 10 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 477
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method log_npu_info has a cyclomatic complexity of 9 (limit is 8)"
+          },
+          "ruleId": "Lizard_ccn-medium"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "npu_utils.py"
+                },
+                "region": {
+                  "startColumn": 1,
+                  "startLine": 0
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Method /mnt/c/Users/tdick/OneDrive/Documents/GitHub/multi-modal-neural-network/src/utils/npu_utils.py has 501 file-nloc (limit is 500)"
+          },
+          "ruleId": "Lizard_file-nloc-medium"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/terryyin/lizard",
+          "name": "Lizard",
+          "rules": null,
+          "version": "1.17.10"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
