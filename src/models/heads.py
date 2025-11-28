@@ -14,6 +14,7 @@ class ClassificationHead(nn.Module):
         hidden_dim: int = 512,
         num_classes: int = 1000,
         dropout: float = 0.1,
+        *,
         use_intermediate_layer: bool = True,
     ):
         super().__init__()
@@ -115,6 +116,7 @@ class ContrastiveHead(nn.Module):
         self,
         image_features: torch.Tensor,
         text_features: torch.Tensor,
+        *,
         return_similarity: bool = True,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """

@@ -1,25 +1,26 @@
 """GPU detection and configuration utilities."""
 
-import platform
-import subprocess
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import platform
+import shutil
+import subprocess
+from typing import Any
 
 import torch
 
 logger = logging.getLogger(__name__)
 
 
-def _get_nvml_info() -> Dict[str, Any]:
+def _get_nvml_info() -> dict[str, Any]:
     """Attempt to collect GPU information via NVML (pynvml).
 
     Returns a dict with keys:
-      - available: bool
-      - driver: Optional[str]
-      - devices: list of device info dicts (id, name, total_memory_gb)
+        - available: bool
+        - driver: str | None
+        - devices: list of device info dicts (id, name, total_memory_gb)
     """
     try:
-        import pynvml
+        import pynvml  # noqa: PLC0415
 
         pynvml.nvmlInit()
         driver = pynvml.nvmlSystemGetDriverVersion()
@@ -27,7 +28,7 @@ def _get_nvml_info() -> Dict[str, Any]:
             driver = driver.decode(errors="ignore")
 
         count = pynvml.nvmlDeviceGetCount()
-        devices: List[Dict[str, Any]] = []
+        devices: list[dict[str, Any]] = []
         for idx in range(count):
             handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
             name = pynvml.nvmlDeviceGetName(handle)
@@ -48,15 +49,17 @@ def _get_nvml_info() -> Dict[str, Any]:
         return {"available": False}
 
 
-def _detect_external_gpu(gpu_id: int, gpu_name: str) -> Tuple[bool, Optional[str]]:
+def _detect_external_gpu(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
     """
     Detect if a GPU is external (eGPU via Thunderbolt, USB-C, etc.).
 
     Args:
+
         gpu_id: GPU device ID
         gpu_name: Name of the GPU
 
     Returns:
+
         Tuple of (is_external: bool, connection_type: Optional[str]).
         Examples for `connection_type`: 'Thunderbolt', 'USB-C', or 'PCIe External'.
     """
@@ -76,9 +79,7 @@ def _detect_external_gpu(gpu_id: int, gpu_name: str) -> Tuple[bool, Optional[str
     return False, None
 
 
-def _detect_external_gpu_windows(
-    gpu_id: int, gpu_name: str
-) -> Tuple[bool, Optional[str]]:
+def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
     """Windows-specific external GPU detection using PowerShell."""
     # Build the PowerShell command in short concatenated pieces
     cmd_parts = [
@@ -98,6 +99,10 @@ def _detect_external_gpu_windows(
         "}",
     ]
     cmd = " ".join(cmd_parts)
+    # Only run PowerShell if available
+    if not shutil.which("powershell"):
+        return False, None
+
     result = subprocess.run(
         ["powershell", "-Command", cmd],
         capture_output=True,
@@ -118,61 +123,64 @@ def _detect_external_gpu_windows(
     return False, None
 
 
-def _detect_external_gpu_linux() -> Tuple[bool, Optional[str]]:
+def _detect_external_gpu_linux() -> tuple[bool, str | None]:
     """Linux-specific external GPU detection using lspci output."""
-    try:
-        result = subprocess.run(
-            ["lspci", "-vv"], capture_output=True, text=True, timeout=5, check=False
-        )
-        if result.returncode == 0:
-            lines = result.stdout.split("\n")
-            for i, line in enumerate(lines):
-                if "VGA" in line or "Display" in line:
-                    for j in range(i, min(i + 20, len(lines))):
-                        check_line = lines[j].lower()
-                        if "thunderbolt" in check_line:
-                            return True, "Thunderbolt"
-                        if "external" in check_line:
-                            return True, "PCIe External"
-    except FileNotFoundError:
-        pass
+    if not shutil.which("lspci"):
+        return False, None
+
+    result = subprocess.run(
+        ["lspci", "-vv"], capture_output=True, text=True, timeout=5, check=False
+    )
+    if result.returncode == 0:
+        lines = result.stdout.split("\n")
+        for i, line in enumerate(lines):
+            if "VGA" in line or "Display" in line:
+                for j in range(i, min(i + 20, len(lines))):
+                    check_line = lines[j].lower()
+                    if "thunderbolt" in check_line:
+                        return True, "Thunderbolt"
+                    if "external" in check_line:
+                        return True, "PCIe External"
     return False, None
 
 
-def _detect_external_gpu_darwin() -> Tuple[bool, Optional[str]]:
+def _detect_external_gpu_darwin() -> tuple[bool, str | None]:
     """macOS-specific external GPU detection using system_profiler."""
-    try:
-        result = subprocess.run(
-            ["system_profiler", "SPThunderboltDataType", "SPDisplaysDataType"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        if result.returncode == 0:
-            output = result.stdout.lower()
-            if "egpu" in output or ("thunderbolt" in output and "display" in output):
-                return True, "Thunderbolt"
-    except FileNotFoundError:
-        pass
+    if not shutil.which("system_profiler"):
+        return False, None
+
+    result = subprocess.run(
+        ["system_profiler", "SPThunderboltDataType", "SPDisplaysDataType"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    if result.returncode == 0:
+        output = result.stdout.lower()
+        if "egpu" in output or ("thunderbolt" in output and "display" in output):
+            return True, "Thunderbolt"
     return False, None
 
 
-def _query_nvidia_smi() -> List[str]:
+def _query_nvidia_smi() -> list[str]:
     """Return lines from `nvidia-smi -L` when available, else empty list."""
+    if not shutil.which("nvidia-smi"):
+        return []
+
     try:
         result = subprocess.run(
             ["nvidia-smi", "-L"], capture_output=True, text=True, timeout=3, check=False
         )
         if result.returncode == 0 and result.stdout.strip():
             return [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        # nvidia-smi not available or timed out
+    except subprocess.TimeoutExpired:
+        # nvidia-smi timed out
         pass
     return []
 
 
-def _populate_nvidia_smi_info(info: Dict[str, Any], parsed: List[str]) -> None:
+def _populate_nvidia_smi_info(info: dict[str, Any], parsed: list[str]) -> None:
     """Populate `info` dict with parsed nvidia-smi names.
 
     This is a separate helper to reduce complexity in callers.
@@ -180,7 +188,7 @@ def _populate_nvidia_smi_info(info: Dict[str, Any], parsed: List[str]) -> None:
     if not parsed:
         return
     info["nvidia_smi"] = True
-    parsed_names: List[str] = []
+    parsed_names: list[str] = []
     for line in parsed:
         parts = line.split(":", 1)
         name = parts[1].strip() if len(parts) > 1 else line
@@ -188,7 +196,7 @@ def _populate_nvidia_smi_info(info: Dict[str, Any], parsed: List[str]) -> None:
     info["nvidia_gpus"] = parsed_names
 
 
-def _collect_cuda_devices(info: Dict[str, Any]) -> None:
+def _collect_cuda_devices(info: dict[str, Any]) -> None:
     """Collect per-GPU device properties and memory info into `info` dict."""
     for i in range(info["device_count"]):
         device_props = torch.cuda.get_device_properties(i)
@@ -231,9 +239,9 @@ def _collect_cuda_devices(info: Dict[str, Any]) -> None:
         }
 
 
-def detect_gpu_info() -> Dict[str, Any]:
-    """
-    Detect available GPU information and capabilities.
+def detect_gpu_info() -> dict[str, Any]:
+    """Detect available GPU information and capabilities.
+
     Includes basic eGPU detection (Thunderbolt, USB-C, etc.).
 
     Returns:
@@ -310,17 +318,16 @@ def detect_gpu_info() -> Dict[str, Any]:
     return info
 
 
-def print_gpu_info(info: Optional[Dict[str, Any]] = None) -> None:
-    """
-    Print formatted GPU information.
+def print_gpu_info(info: dict[str, Any] | None = None) -> None:
+    """Print formatted GPU information.
 
     Args:
+
         info: GPU info dict from detect_gpu_info(). If None, will detect automatically.
     """
     if info is None:
         info = detect_gpu_info()
-
-    logger.info("\n" + "=" * 70)
+    logger.info("\n%s", "=" * 70)
     logger.info("GPU CONFIGURATION")
     logger.info("=" * 70)
 
@@ -341,7 +348,7 @@ def print_gpu_info(info: Optional[Dict[str, Any]] = None) -> None:
     logger.info("Recommended device: %s", info["recommended_device"])
 
     logger.info("\n%s", "GPU Details:")
-    logger.info("-" * 70)
+    logger.info("%s", "-" * 70)
 
     for device in info["devices"]:
         gpu_type = "🔌 External" if device.get("is_external", False) else "💻 Internal"
@@ -368,17 +375,18 @@ def print_gpu_info(info: Optional[Dict[str, Any]] = None) -> None:
                 "    ⚠ Limited mixed precision support (compute capability < 7.0)"
             )
 
-    logger.info("\n" + "=" * 70)
+    logger.info("\n%s", "=" * 70)
 
 
-def get_optimal_device(prefer_gpu: bool = True) -> str:
-    """
-    Get the optimal device string for training.
+def get_optimal_device(*, prefer_gpu: bool = True) -> str:
+    """Get the optimal device string for training.
 
     Args:
+
         prefer_gpu: If True, prefer GPU when available. Otherwise use CPU.
 
     Returns:
+
         Device string ('cuda', 'cuda:0', 'cpu', etc.)
     """
     if not prefer_gpu:
@@ -389,7 +397,7 @@ def get_optimal_device(prefer_gpu: bool = True) -> str:
     return str(info["recommended_device"])
 
 
-def _handle_gpu_id_override(gpu_id: int, verbose: bool = True) -> Optional[str]:
+def _handle_gpu_id_override(gpu_id: int, *, verbose: bool = True) -> str:
     """Handle explicit GPU id overrides, returning a device string or 'cpu'."""
     if not torch.cuda.is_available():
         if verbose:
@@ -407,7 +415,7 @@ def _handle_gpu_id_override(gpu_id: int, verbose: bool = True) -> Optional[str]:
     return f"cuda:{gpu_id}"
 
 
-def _ensure_valid_device_string(dev_str: str, verbose: bool = True) -> str:
+def _ensure_valid_device_string(dev_str: str, *, verbose: bool = True) -> str:
     """Validate device string and fall back to CPU if CUDA not available."""
     if dev_str.startswith("cuda") and not torch.cuda.is_available():
         if verbose:
@@ -431,7 +439,7 @@ def _print_gpu_verbose(dev: torch.device) -> None:
 
 
 def _resolve_device_string(
-    device: Optional[str], gpu_id: Optional[int], verbose: bool = True
+    device: str | None, gpu_id: int | None, *, verbose: bool = True
 ) -> str:
     """Resolve and validate the device string to use for training.
 
@@ -439,32 +447,33 @@ def _resolve_device_string(
     """
     # Handle gpu_id override
     if gpu_id is not None:
-        return _handle_gpu_id_override(gpu_id, verbose)
+        return _handle_gpu_id_override(gpu_id, verbose=verbose)
 
     # Auto-detect if not specified
     if device is None:
         device = get_optimal_device()
 
-    return _ensure_valid_device_string(device, verbose)
+    return _ensure_valid_device_string(device, verbose=verbose)
 
 
 def configure_device_for_training(
-    device: Optional[str] = None, gpu_id: Optional[int] = None, verbose: bool = True
+    device: str | None = None, gpu_id: int | None = None, *, verbose: bool = True
 ) -> torch.device:
-    """
-    Configure and return a torch device for training.
+    """Configure and return a torch device for training.
 
     Args:
+
         device: Device string ('cuda', 'cpu', 'cuda:0', etc.). If None, auto-detect.
         gpu_id: Specific GPU ID to use. Overrides device if both specified.
         verbose: Print device information.
 
     Returns:
+
         torch.device object configured for training.
     """
 
     # Resolve and validate the device string using the module-level helper.
-    resolved = _resolve_device_string(device, gpu_id, verbose)
+    resolved = _resolve_device_string(device, gpu_id, verbose=verbose)
 
     torch_device = torch.device(resolved)
 
@@ -476,9 +485,8 @@ def configure_device_for_training(
     return torch_device
 
 
-def check_mixed_precision_support() -> Dict[str, bool]:
-    """
-    Check what types of mixed precision training are supported.
+def check_mixed_precision_support() -> dict[str, bool]:
+    """Check what types of mixed precision training are supported.
 
     Returns:
         Dictionary with support flags for different precision types.
@@ -514,11 +522,11 @@ if __name__ == "__main__":
     info = detect_gpu_info()
     print_gpu_info(info)
 
-    print("\nMixed Precision Support:")
+    logger.info("\nMixed Precision Support:")
     mp_support = check_mixed_precision_support()
     for precision, supported in mp_support.items():
         status = "✅" if supported else "❌"
-        print(f"  {status} {precision.upper()}")
+        logger.info("  %s %s", status, precision.upper())
 
-    print("\nRecommended Configuration:")
+    logger.info("\nRecommended Configuration:")
     device = configure_device_for_training(verbose=True)

@@ -90,6 +90,7 @@ class MultiTaskLoss(nn.Module):
         self,
         task_names: list,
         loss_fns: Dict[str, nn.Module],
+        *,
         use_uncertainty_weighting: bool = True,
     ):
         super().__init__()

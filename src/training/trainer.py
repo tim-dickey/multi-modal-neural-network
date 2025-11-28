@@ -556,6 +556,7 @@ class Trainer:
         path: Optional[str] = None,
         epoch: Optional[int] = None,
         step: Optional[int] = None,
+        *,
         is_best: bool = False,
     ) -> None:
         """Save model checkpoint.

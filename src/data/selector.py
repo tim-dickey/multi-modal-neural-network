@@ -93,7 +93,7 @@ def _merge(parts: List[Dataset]) -> Optional[Dataset]:
 
 
 def _make_loader(
-    ds: Dataset, batch_size: int, shuffle: bool, num_workers: int, pin_memory: bool
+    ds: Dataset, batch_size: int, num_workers: int, *, shuffle: bool, pin_memory: bool
 ) -> DataLoader:
     return DataLoader(
         ds,
@@ -159,7 +159,7 @@ def build_dataloaders(
     if train_ds is None:
         raise ValueError("No training data assembled. Check splits / enabled flags.")
 
-    def _make_loader(ds: Dataset, shuffle: bool) -> DataLoader:
+    def _make_loader(ds: Dataset, *, shuffle: bool) -> DataLoader:
         return DataLoader(
             ds,
             batch_size=batch_size,
@@ -169,9 +169,9 @@ def build_dataloaders(
             drop_last=False,
         )
 
-    train_loader = _make_loader(train_ds, shuffle_train)
-    val_loader = _make_loader(val_ds, False) if val_ds else None
-    test_loader = _make_loader(test_ds, False) if test_ds else None
+    train_loader = _make_loader(train_ds, shuffle=shuffle_train)
+    val_loader = _make_loader(val_ds, shuffle=False) if val_ds else None
+    test_loader = _make_loader(test_ds, shuffle=False) if test_ds else None
     return train_loader, val_loader, test_loader
 
 

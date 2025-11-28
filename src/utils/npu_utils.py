@@ -5,7 +5,6 @@ import logging
 import platform
 import shutil
 import subprocess
-import contextlib
 from importlib import util as importlib_util
 from typing import Any
 
@@ -300,9 +299,9 @@ def _detect_intel_npu() -> bool:
                 for dev in devices:
                     if "VPU" in dev or "NPU" in dev:
                         return True
-        except Exception:
-            # Any failure during the DirectML probe is non-fatal
-            logger.debug("DirectML probe failed", exc_info=True)
+        except (ImportError, AttributeError, RuntimeError, OSError) as _err:
+            # Any failure during the OpenVINO probe is non-fatal; log for debugging
+            logger.debug("OpenVINO probe failed: %s", _err, exc_info=True)
 
         return False
 
@@ -341,8 +340,12 @@ def _detect_amd_npu() -> bool:
         try:
             if importlib_util.find_spec("ryzen_ai") is not None:
                 return True
-        except (ImportError, AttributeError, RuntimeError, OSError):
-            pass
+        except (ImportError, AttributeError, RuntimeError, OSError) as _err:
+            logger.debug(
+                "DirectML/torch_directml probe failed: %s",
+                _err,
+                exc_info=True,
+            )
 
         return False
 
@@ -457,10 +460,11 @@ def _detect_windows_directml_npu() -> dict[str, Any]:
         return info
 
 
-def log_npu_info(info: dict[str, Any] | None = None, verbose: bool = True) -> None:
+def log_npu_info(info: dict[str, Any] | None = None, *, verbose: bool = True) -> None:
     """Log formatted NPU information.
 
     Args:
+
         info: NPU info dict from :func:`detect_npu_info`. If ``None``, will detect
             automatically.
         verbose: If ``False``, returns early without logging detailed info. This
@@ -520,13 +524,17 @@ def check_accelerator_availability() -> dict[str, bool]:
     Returns a dict with boolean availability for: cpu, cuda, mps, npu.
     """
     try:
-        import torch
+        import torch  # noqa: PLC0415
 
         cuda_avail = torch.cuda.is_available()
         mps_avail = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-    except Exception:
+    except (ImportError, OSError, RuntimeError) as _err:
         # Torch not installed or import failed; report accelerators as unavailable
-        logger.debug("torch not available when checking accelerators", exc_info=True)
+        logger.debug(
+            "torch not available when checking accelerators: %s",
+            _err,
+            exc_info=True,
+        )
         cuda_avail = False
         mps_avail = False
 
@@ -538,7 +546,7 @@ def check_accelerator_availability() -> dict[str, bool]:
     }
 
 
-def get_best_available_device(prefer_npu: bool = False) -> str:
+def get_best_available_device(*, prefer_npu: bool = False) -> str:
     """
     Get the best available device for training/inference.
 
@@ -555,12 +563,14 @@ def get_best_available_device(prefer_npu: bool = False) -> str:
     4. CPU
 
     Args:
+
         prefer_npu: If True, prefer NPU over GPU when both available
 
     Returns:
+
         Device string to use
     """
-    import torch
+    import torch  # noqa: PLC0415
 
     if prefer_npu:
         npu_local = detect_npu_info()

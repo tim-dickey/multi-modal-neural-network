@@ -25,6 +25,7 @@ class MultiModalModel(nn.Module):
         fusion_config: Dict,
         double_loop_config: Dict,
         head_config: Dict,
+        *,
         use_double_loop: bool = True,
         gradient_checkpointing: bool = False,
     ):
@@ -142,6 +143,7 @@ class MultiModalModel(nn.Module):
         input_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.Tensor] = None,
+        *,
         return_features: bool = False,
         task_name: Optional[str] = None,
         current_loss: Optional[torch.Tensor] = None,
@@ -249,7 +251,7 @@ class MultiModalModel(nn.Module):
 
         return outputs
 
-    def get_num_parameters(self, trainable_only: bool = True) -> int:
+    def get_num_parameters(self, *, trainable_only: bool = True) -> int:
         """Count model parameters."""
         if trainable_only:
             return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -338,6 +340,7 @@ def load_pretrained_weights(
     model: MultiModalModel,
     vision_checkpoint: Optional[str] = None,
     text_checkpoint: Optional[str] = None,
+    *,
     strict: bool = False,
 ) -> MultiModalModel:
     """
