@@ -1,0 +1,47 @@
+name: PyTorch Upgrade Smoke
+
+on:
+  pull_request:
+    branches:
+      - fix/upgrade-pytorch-2.6
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [3.10, 3.11]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install candidate PyTorch
+        run: |
+          # Candidate pin from upgrade branch
+          pip install --no-cache-dir torch==2.6.2 torchvision==0.16.2
+
+      - name: Install project (dev) dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run smoke tests (one training epoch)
+        run: |
+          # Run a focused integration test to smoke-check PyTorch compatibility
+          pytest tests/test_integration.py::TestEndToEndTraining::test_training_epoch -q
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytorch-smoke-logs
+          path: |
+            .pytest_cache
+            pytest.log || true

@@ -169,3 +169,24 @@ jobs:
             codacy-analyze-help.txt
             .codacy-cli-v2
             .codacy
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find any SARIF files produced by the Codacy CLI and upload them
+          set -e
+          found=false
+          for f in $(find . -type f -name '*.sarif' -print); do
+            echo "Uploading $f to GitHub Code Scanning API"
+            curl -s -S -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data-binary @"$f" \
+              "https://api.github.com/repos/${{ github.repository }}/code-scanning/sarifs" || true
+            found=true
+          done
+          if [ "$found" = false ]; then
+            echo "No SARIF files found; skipping upload"
+          fi
