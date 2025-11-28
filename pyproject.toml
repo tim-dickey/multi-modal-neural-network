@@ -13,7 +13,7 @@ license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "torch>=2.1.0",
+    "torch>=2.6.0,<3",
     "torchvision>=0.16.0",
     "transformers==4.57.3",
     "datasets>=2.14.0",
