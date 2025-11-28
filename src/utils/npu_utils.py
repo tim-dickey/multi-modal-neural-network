@@ -6,33 +6,16 @@ import platform
 import shutil
 import subprocess
 from importlib import util as importlib_util
-from typing import Any
+from typing import Any, Optional
+from .subprocess_utils import _safe_subprocess_run as _safe_run
 
 logger = logging.getLogger(__name__)
 
 
-def _safe_run(
-    cmd: list[str],
-    timeout: int = 5,
-    **kwargs: Any,
-) -> subprocess.CompletedProcess:
-    """Run a subprocess command safely for probe use.
-
-    - Resolves the executable via `shutil.which` when possible.
-    - Forces `check=False` to avoid raising in probes.
-    """
-    if not cmd:
-        msg = "cmd must be a non-empty list"
-        raise ValueError(msg)
-
-    resolved = shutil.which(cmd[0])
-    if resolved:
-        cmd = [resolved, *cmd[1:]]
-
-    return subprocess.run(cmd, timeout=timeout, check=False, **kwargs)
+# Centralized subprocess helper is imported above as `_safe_run`
 
 
-def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> subprocess.CompletedProcess:
+def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> Optional[subprocess.CompletedProcess]:
     """Run a PowerShell PnP device probe command via :func:`_safe_run`.
 
     The function accepts the body of the PowerShell command (the part after
@@ -97,7 +80,7 @@ def _detect_external_npu_windows() -> tuple[bool, str | None]:
     # Use the centralized PowerShell probe helper which wraps _safe_run
     result = _run_powershell_pnp_probe(cmd)
 
-    if result.returncode == 0 and result.stdout:
+    if result and result.returncode == 0 and getattr(result, "stdout", None):
         lines = result.stdout.strip().split("\n")
         for line in lines:
             if any(
@@ -119,7 +102,7 @@ def _detect_external_npu_linux() -> tuple[bool, str | None]:
     # Check for USB devices (only run probe if the tool exists)
     if shutil.which("lsusb"):
         result = _safe_run(["lsusb"], capture_output=True, text=True)
-        if result.returncode == 0:
+        if result and result.returncode == 0 and getattr(result, "stdout", None):
             output = result.stdout.lower()
             if "movidius" in output or "neural compute stick" in output:
                 return True, "Intel Movidius NCS"
@@ -129,7 +112,7 @@ def _detect_external_npu_linux() -> tuple[bool, str | None]:
     # Check for PCIe devices (Hailo, Coral M.2) when lspci is available
     if shutil.which("lspci"):
         result = _safe_run(["lspci"], capture_output=True, text=True)
-        if result.returncode == 0:
+        if result and result.returncode == 0 and getattr(result, "stdout", None):
             output = result.stdout.lower()
             if "hailo" in output:
                 return True, "Hailo AI Accelerator"
@@ -147,7 +130,7 @@ def _detect_external_npu_darwin() -> tuple[bool, str | None]:
             ["system_profiler", "SPUSBDataType"], capture_output=True, text=True
         )
 
-        if result.returncode == 0:
+        if result and result.returncode == 0 and getattr(result, "stdout", None):
             output = result.stdout.lower()
             if "movidius" in output or "neural compute stick" in output:
                 return True, "Intel Movidius NCS"
@@ -297,7 +280,7 @@ def _detect_intel_npu() -> bool:
                     "\n}"
                 )
                 result = _run_powershell_pnp_probe(ps_cmd)
-                if result.returncode == 0 and result.stdout.strip():
+                if result and result.returncode == 0 and getattr(result, "stdout", None) and result.stdout.strip():
                     return True
             except (subprocess.TimeoutExpired, OSError):
                 # PowerShell not available or timed out
@@ -345,7 +328,7 @@ def _detect_amd_npu() -> bool:
                     "\n}"
                 )
                 result = _run_powershell_pnp_probe(ps_cmd)
-                if result.returncode == 0 and result.stdout.strip():
+                if result and result.returncode == 0 and getattr(result, "stdout", None) and result.stdout.strip():
                     return True
             except (subprocess.TimeoutExpired, OSError):
                 pass
@@ -412,7 +395,7 @@ def _detect_apple_neural_engine() -> dict[str, Any]:
                         text=True,
                         timeout=2,
                     )
-                    if result.returncode == 0:
+                    if result and result.returncode == 0 and getattr(result, "stdout", None):
                         chip_name = result.stdout.strip()
                         info["device_name"] = f"Apple Neural Engine ({chip_name})"
                 except subprocess.TimeoutExpired:
