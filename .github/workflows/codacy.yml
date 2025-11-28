@@ -38,6 +38,29 @@ jobs:
           echo "ls -la ~/.cache/codacy (if present):" >> codacy-diag.txt
           ls -la ~/.cache/codacy >> codacy-diag.txt 2>&1 || true
 
+      - name: Capture Codacy CLI version
+        run: |
+          # Locate the extracted Codacy CLI in the runner cache and capture its version
+          cache="$HOME/.cache/codacy/codacy-cli-v2"
+          version="$(awk -F'"' '/version:/ {print $2; exit}' "$cache/version.yaml" 2>/dev/null || true)"
+          BIN=""
+          if [ -n "$version" ] && [ -f "$cache/$version/codacy-cli-v2" ]; then
+            BIN="$cache/$version/codacy-cli-v2"
+          else
+            BIN="$(find "$cache" -maxdepth 3 -type f -name codacy-cli-v2 | head -n1 || true)"
+          fi
+
+          echo "Binary candidate: $BIN"
+          if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
+            echo "Binary not found; listing cache:" >&2
+            ls -la "$cache" || true
+            exit 1
+          fi
+
+          chmod +x "$BIN" || true
+          "$BIN" version > codacy-version.txt 2>&1 || true
+          echo "WROTE codacy-version.txt"
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
