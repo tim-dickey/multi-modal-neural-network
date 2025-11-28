@@ -1,0 +1,49 @@
+name: Codacy Analysis
+
+on:
+  push:
+    branches: [ main, "**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  codacy-scan:
+    name: Codacy Scan (generate SARIF)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure wrapper executable
+        run: |
+          if [ -f ".codacy/cli.sh" ]; then chmod +x .codacy/cli.sh; fi
+
+      - name: Download Codacy CLI
+        run: |
+          if [ -f ".codacy/cli.sh" ]; then sh ./.codacy/cli.sh download; else echo ".codacy/cli.sh not found"; exit 1; fi
+
+      - name: Run Codacy analysis and collect SARIF
+        env:
+          # Increase timeout for heavy scans
+          CODACY_CLI_TIMEOUT: 1800
+        run: |
+          # Run the analyzer; try to request SARIF output if supported, otherwise run analyze
+          mkdir -p /tmp/codacy-sarif
+          if sh ./.codacy/cli.sh analyze --format sarif --out /tmp/codacy-sarif/codacy.sarif; then
+            echo "Codacy analyze produced SARIF at /tmp/codacy-sarif"
+          else
+            echo "Falling back to generic analyze (SARIF may be produced in /tmp)"
+            sh ./.codacy/cli.sh analyze || true
+          fi
+
+          mkdir -p test_logs/codacy
+          # Copy any SARIF files produced into the workspace for artifact upload
+          cp /tmp/codacy-sarif/*.sarif test_logs/codacy/ 2>/dev/null || true
+          cp /tmp/*.sarif test_logs/codacy/ 2>/dev/null || true
+          ls -la test_logs/codacy || echo "No SARIF files found"
+
+      - name: Upload SARIF artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codacy-sarif
+          path: test_logs/codacy/*.sarif
