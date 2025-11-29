@@ -17,6 +17,16 @@ from .optimizer import (
     create_scheduler,
 )
 from .trainer import Trainer
+from .training_defaults import (
+    CHECKPOINT,
+    DATA,
+    LOSS,
+    TRAINING,
+    CheckpointDefaults,
+    DataDefaults,
+    LossDefaults,
+    TrainingDefaults,
+)
 from .training_state import LoggingManager, TrainingComponentsFactory, TrainingState
 
 __all__ = [
@@ -28,6 +38,15 @@ __all__ = [
     "TrainingState",
     "LoggingManager",
     "TrainingComponentsFactory",
+    # Defaults
+    "TRAINING",
+    "DATA",
+    "LOSS",
+    "CHECKPOINT",
+    "TrainingDefaults",
+    "DataDefaults",
+    "LossDefaults",
+    "CheckpointDefaults",
     # Losses
     "CrossEntropyLoss",
     "ContrastiveLoss",

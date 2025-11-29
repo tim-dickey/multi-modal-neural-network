@@ -10,10 +10,15 @@ from torch.utils.data import DataLoader
 
 from ..utils.logging import MetricsLogger, WandbLogger
 
-# Type hints for forward references
-if False:  # TYPE_CHECKING equivalent without importing
-    from .losses import MetaLoss
-    from .optimizer import AdaptiveLRController, GradientClipper
+from .training_defaults import TRAINING
+
+# Type hints for IDE support - these are used in method signatures
+# Import here to avoid circular imports at runtime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .losses import MetaLoss  # noqa: F401
+    from .optimizer import AdaptiveLRController, GradientClipper  # noqa: F401
 
 
 class TrainingState:
@@ -284,7 +289,9 @@ class TrainingComponentsFactory:
         """
         from .optimizer import GradientClipper
 
-        max_grad_norm = self.config.get("training", {}).get("max_grad_norm", 1.0)
+        max_grad_norm = self.config.get("training", {}).get(
+            "max_grad_norm", TRAINING.max_grad_norm
+        )
         return GradientClipper(max_norm=max_grad_norm)
 
     def create_adaptive_lr_controller(
@@ -298,7 +305,9 @@ class TrainingComponentsFactory:
         if getattr(self.model, "use_double_loop", False):
             from .optimizer import AdaptiveLRController
 
-            base_lr = self.config.get("training", {}).get("inner_lr", 3e-4)
+            base_lr = self.config.get("training", {}).get(
+                "inner_lr", TRAINING.learning_rate
+            )
             return AdaptiveLRController(base_lr=base_lr)
         return None
 
