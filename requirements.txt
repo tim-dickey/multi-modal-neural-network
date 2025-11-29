@@ -1,9 +1,17 @@
 # Core ML
 torch>=2.8.0
-torchvision>=0.16.2
+torchvision>=0.23.0
 transformers>=4.57.3,<5
 pycocotools>=2.0.0
 wandb>=0.15.0
+
+# Data loading
+datasets>=2.14.0
+webdataset>=0.2.0
+
+# Caching
+redis>=4.5.4
+diskcache>=5.6.0
 
 # Integrations
 wolframalpha>=5.0.0

@@ -1,4 +1,4 @@
-## PyTorch Upgrade Plan (branch: fix/upgrade-pytorch-2.6)
+## PyTorch Upgrade Plan (branch: fix/upgrade-pytorch-2.8)
 
 Goal
 ----
@@ -6,14 +6,14 @@ Prepare and validate an upgrade of the project's PyTorch runtime while minimizin
 
 Approach
 --------
-- Perform the upgrade in a dedicated branch `fix/upgrade-pytorch-2.6`.
+- Perform the upgrade in a dedicated branch `fix/upgrade-pytorch-2.8`.
 - Do not merge until the upgrade passes targeted smoke tests and full test-suite runs on CI.
 - Keep non-breaking library upgrades in separate PRs (this branch focuses on runtime upgrade verification).
 
 Suggested steps
 ---------------
 1. Select target versions:
-   - Choose a specific `torch` and `torchvision` patch/minor pair compatible with our environment (e.g. `torch==2.6.x` and matching `torchvision`).
+   - Choose a specific `torch` and `torchvision` patch/minor pair compatible with our environment (e.g. `torch>=2.8.0` and matching `torchvision>=0.23.0`).
    - Prefer CPU wheels for CI smoke tests; schedule GPU matrix separately if needed.
 
 2. Add CI matrix job(s):
