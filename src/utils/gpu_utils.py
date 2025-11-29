@@ -521,8 +521,8 @@ def check_mixed_precision_support() -> dict[str, bool]:
             # TF32 is available on Ampere (8.0) and newer
             if compute_capability >= (8, 0):
                 support["tf32"] = True
-    except Exception:
-        # Fail-safe: leave support flags as default False for bf16/tf32
+    except (RuntimeError, AssertionError, AttributeError):
+        # Fail-safe: CUDA errors or missing attributes leave flags as default False
         pass
 
     return support

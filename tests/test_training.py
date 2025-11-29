@@ -249,9 +249,7 @@ class TestAdaptiveLRController:
         params = torch.randn(10, requires_grad=True)
         optimizer = torch.optim.SGD([params], lr=0.1)
         controller = AdaptiveLRController(base_lr=0.1, min_scale=0.1, max_scale=2.0)
-        
-        initial_lr = optimizer.param_groups[0]["lr"]
-        
+
         # Update with scale factor of 0.5 (middle of range)
         controller.update_lr(optimizer, torch.tensor(0.5))
         
@@ -368,10 +366,11 @@ class TestLearningRateScheduling:
             if update_freq == "step":
                 # Call optimizer.step() before scheduler.step() to match
                 # PyTorch's recommended ordering and avoid warnings.
+                # Some optimizers may require gradients; ignore in tests
                 try:
                     optimizer.step()
-                except Exception:
-                    # Some optimizers may require gradients; ignore in tests
+                except (RuntimeError, ValueError):
+                    # Expected: optimizer may require gradients to be set
                     pass
                 scheduler.step()
 

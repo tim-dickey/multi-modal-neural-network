@@ -84,27 +84,6 @@ def _assemble_buckets(
             buckets[split_name].append(Subset(ds, split_indices))
 
 
-def _merge(parts: List[Dataset]) -> Optional[Dataset]:
-    if not parts:
-        return None
-    if len(parts) == 1:
-        return parts[0]
-    return ConcatDataset(parts)
-
-
-def _make_loader(
-    ds: Dataset, batch_size: int, num_workers: int, *, shuffle: bool, pin_memory: bool
-) -> DataLoader:
-    return DataLoader(
-        ds,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        drop_last=False,
-    )
-
-
 def build_dataloaders(
     config: Dict[str, Any],
 ) -> Tuple[DataLoader, Optional[DataLoader], Optional[DataLoader]]:
