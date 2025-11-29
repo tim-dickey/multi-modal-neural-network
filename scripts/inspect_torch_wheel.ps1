@@ -3,7 +3,7 @@
 
 param(
     [string]$TorchVersion = "2.8.0",
-    [string]$TorchVisionVersion = "0.20.0",
+    [string]$TorchVisionVersion = "0.23.0",
     [string]$DownloadDir = "$env:TEMP\torch-wheels"
 )
 
