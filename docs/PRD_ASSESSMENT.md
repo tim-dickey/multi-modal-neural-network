@@ -459,7 +459,7 @@ tests/
 |---------|---------|--------|
 | Python | >=3.10 | ✅ Current |
 | PyTorch | >=2.8.0 | ✅ Current |
-| TorchVision | >=0.20.0 | ✅ Current |
+| TorchVision | >=0.23.0 | ✅ Current |
 | NumPy | Latest | ✅ Current |
 | PyYAML | Latest | ✅ Current |
 | Pillow | Latest | ✅ Current |

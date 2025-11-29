@@ -13,7 +13,7 @@ Approach
 Suggested steps
 ---------------
 1. Select target versions:
-   - Choose a specific `torch` and `torchvision` patch/minor pair compatible with our environment (e.g. `torch>=2.8.0` and matching `torchvision>=0.20.0`).
+   - Choose a specific `torch` and `torchvision` patch/minor pair compatible with our environment (e.g. `torch>=2.8.0` and matching `torchvision>=0.23.0`).
    - Prefer CPU wheels for CI smoke tests; schedule GPU matrix separately if needed.
 
 2. Add CI matrix job(s):
