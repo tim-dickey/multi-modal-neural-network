@@ -206,6 +206,7 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {
 ```
 PyTorch: 2.3.0+cu121
 CUDA: True
+```
 
 ### Installation Workflow Diagram
 
