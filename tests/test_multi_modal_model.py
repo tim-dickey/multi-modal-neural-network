@@ -19,7 +19,11 @@ class DummyEncoder(torch.nn.Module):
             batch = input_ids.shape[0]
         else:
             batch = 1
-        device = x.device if x is not None else (input_ids.device if input_ids is not None else "cpu")
+        device = (
+            x.device
+            if x is not None
+            else (input_ids.device if input_ids is not None else "cpu")
+        )
         cls = torch.randn(batch, self.hidden_dim, device=device)
         features = torch.randn(batch, self.seq_len, self.hidden_dim, device=device)
         return cls, features
@@ -31,7 +35,14 @@ class DummyFusion(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.fusion_type = fusion_type
 
-    def forward(self, vision_features=None, text_features=None, vision_pooled=None, text_pooled=None, **kwargs):
+    def forward(
+        self,
+        vision_features=None,
+        text_features=None,
+        vision_pooled=None,
+        text_pooled=None,
+        **kwargs,
+    ):
         if self.fusion_type == "late":
             # Late fusion returns pooled features directly
             pooled = vision_pooled + text_pooled
@@ -43,11 +54,25 @@ class DummyFusion(torch.nn.Module):
 
 def make_minimal_model(monkeypatch, fusion_type="early"):
     # Monkeypatch creators to simple dummies
-    monkeypatch.setattr(mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32, fusion_type=fusion_type))
-    monkeypatch.setattr(mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True}))
-    monkeypatch.setattr(mmm, "create_task_head", lambda cfg: mmm.MultiTaskHead(hidden_dim=32, tasks={"default": {}}))
+    monkeypatch.setattr(
+        mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm,
+        "create_fusion_layer",
+        lambda cfg: DummyFusion(hidden_dim=32, fusion_type=fusion_type),
+    )
+    monkeypatch.setattr(
+        mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True})
+    )
+    monkeypatch.setattr(
+        mmm,
+        "create_task_head",
+        lambda cfg: mmm.MultiTaskHead(hidden_dim=32, tasks={"default": {}}),
+    )
 
     cfg = {
         "model": {
@@ -55,9 +80,9 @@ def make_minimal_model(monkeypatch, fusion_type="early"):
             "text_encoder": {},
             "fusion": {"hidden_dim": 32, "type": fusion_type},
             "double_loop": {},
-            "heads": {}
+            "heads": {},
         },
-        "training": {}
+        "training": {},
     }
     model = mmm.create_multi_modal_model(cfg)
     return model
@@ -120,6 +145,7 @@ def test_apply_task_head_helper(monkeypatch):
 
 def test_apply_task_head_single_task(monkeypatch):
     """Test _apply_task_head with a single-task head."""
+
     # Create a simple classification head
     class SimpleHead(torch.nn.Module):
         def __init__(self, hidden_dim, num_classes=10):
@@ -129,10 +155,18 @@ def test_apply_task_head_single_task(monkeypatch):
         def forward(self, x):
             return self.fc(x)
 
-    monkeypatch.setattr(mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True}))
+    monkeypatch.setattr(
+        mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True})
+    )
     monkeypatch.setattr(mmm, "create_task_head", lambda cfg: SimpleHead(hidden_dim=32))
 
     cfg = {"model": {"fusion": {"hidden_dim": 32}}, "training": {}}
@@ -148,6 +182,7 @@ def test_apply_task_head_single_task(monkeypatch):
 
 def test_apply_task_head_contrastive(monkeypatch):
     """Test _apply_task_head with a contrastive head."""
+
     class ContrastiveHead(torch.nn.Module):
         def __init__(self, hidden_dim):
             super().__init__()
@@ -156,11 +191,21 @@ def test_apply_task_head_contrastive(monkeypatch):
         def forward(self, vision_features, text_features):
             return torch.matmul(vision_features, text_features.T)
 
-    monkeypatch.setattr(mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True}))
-    monkeypatch.setattr(mmm, "create_task_head", lambda cfg: ContrastiveHead(hidden_dim=32))
+    monkeypatch.setattr(
+        mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True})
+    )
+    monkeypatch.setattr(
+        mmm, "create_task_head", lambda cfg: ContrastiveHead(hidden_dim=32)
+    )
 
     cfg = {"model": {"fusion": {"hidden_dim": 32}}, "training": {}}
     model = mmm.create_multi_modal_model(cfg)
@@ -170,19 +215,30 @@ def test_apply_task_head_contrastive(monkeypatch):
     text_cls = torch.randn(2, 32)
 
     # Test with task_name="contrastive"
-    outputs = model._apply_task_head(pooled, vision_cls, text_cls, task_name="contrastive")
+    outputs = model._apply_task_head(
+        pooled, vision_cls, text_cls, task_name="contrastive"
+    )
     assert "logits" in outputs
 
 
 def test_apply_task_head_no_forward(monkeypatch):
     """Test _apply_task_head when head has no forward method (passthrough)."""
+
     class PassthroughHead:
         pass
 
-    monkeypatch.setattr(mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32))
-    monkeypatch.setattr(mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True}))
+    monkeypatch.setattr(
+        mmm, "create_vision_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_text_encoder", lambda cfg: DummyEncoder(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_fusion_layer", lambda cfg: DummyFusion(hidden_dim=32)
+    )
+    monkeypatch.setattr(
+        mmm, "create_double_loop_controller", lambda cfg: (lambda **k: {"ok": True})
+    )
     monkeypatch.setattr(mmm, "create_task_head", lambda cfg: PassthroughHead())
 
     cfg = {"model": {"fusion": {"hidden_dim": 32}}, "training": {}}
@@ -216,7 +272,7 @@ def test_load_pretrained_weights(monkeypatch, tmp_path):
         vision_checkpoint=str(vision_ckpt_path),
         text_checkpoint=str(text_ckpt_path),
         strict=False,
-        allow_external=True
+        allow_external=True,
     )
 
     assert result is model
@@ -231,7 +287,9 @@ def test_load_pretrained_weights_with_wrapper(monkeypatch, tmp_path):
     text_ckpt_path = tmp_path / "text_wrapped.pt"
 
     # Save model state dicts in wrapper format
-    torch.save({"model_state_dict": model.vision_encoder.state_dict()}, vision_ckpt_path)
+    torch.save(
+        {"model_state_dict": model.vision_encoder.state_dict()}, vision_ckpt_path
+    )
     torch.save({"model_state_dict": model.text_encoder.state_dict()}, text_ckpt_path)
 
     # Test loading
@@ -240,7 +298,7 @@ def test_load_pretrained_weights_with_wrapper(monkeypatch, tmp_path):
         vision_checkpoint=str(vision_ckpt_path),
         text_checkpoint=str(text_ckpt_path),
         strict=False,
-        allow_external=True
+        allow_external=True,
     )
 
     assert result is model

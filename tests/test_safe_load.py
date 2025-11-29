@@ -21,7 +21,11 @@ def test_safe_load_missing_expected_keys(tmp_path: Path):
     torch.save({"model_state_dict": {}}, str(path))
 
     with pytest.raises(ValueError):
-        safe_load_checkpoint(str(path), map_location="cpu", expected_keys={"model_state_dict", "optimizer_state_dict"})
+        safe_load_checkpoint(
+            str(path),
+            map_location="cpu",
+            expected_keys={"model_state_dict", "optimizer_state_dict"},
+        )
 
 
 def test_safe_load_safetensors_roundtrip(tmp_path: Path):
@@ -37,7 +41,10 @@ def test_safe_load_safetensors_roundtrip(tmp_path: Path):
     loaded = safe_load_checkpoint(str(sf_path), map_location="cpu")
     assert isinstance(loaded, dict)
     assert "weight" in loaded
-    assert torch.allclose(loaded["weight"], td["weight"]) or loaded["weight"].shape == td["weight"].shape
+    assert (
+        torch.allclose(loaded["weight"], td["weight"])
+        or loaded["weight"].shape == td["weight"].shape
+    )
 
 
 def test_allow_external_flag(tmp_path: Path):
@@ -53,5 +60,7 @@ def test_allow_external_flag(tmp_path: Path):
         safe_load_checkpoint(str(external_ckpt), map_location="cpu")
 
     # When explicitly allowed, it should succeed
-    loaded = safe_load_checkpoint(str(external_ckpt), map_location="cpu", allow_external=True)
+    loaded = safe_load_checkpoint(
+        str(external_ckpt), map_location="cpu", allow_external=True
+    )
     assert isinstance(loaded, dict)

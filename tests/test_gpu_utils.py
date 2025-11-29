@@ -25,7 +25,7 @@ def test_detect_gpu_info_with_cuda(monkeypatch):
         name = "FakeGPU"
         major = 7
         minor = 5
-        total_memory = 8 * 1024 ** 3
+        total_memory = 8 * 1024**3
         multi_processor_count = 4
 
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda i: FakeProps)
@@ -69,7 +69,7 @@ def test_get_nvml_info_monkeypatched(monkeypatch):
             return b"FakeGPU"
 
         def nvmlDeviceGetMemoryInfo(self, handle):
-            return FakeMem(8 * 1024 ** 3)
+            return FakeMem(8 * 1024**3)
 
         def nvmlShutdown(self):
             return None
@@ -106,7 +106,7 @@ def test_collect_cuda_devices_handles_memory_errors(monkeypatch):
         name = "FakeGPU"
         major = 7
         minor = 0
-        total_memory = 4 * 1024 ** 3
+        total_memory = 4 * 1024**3
         multi_processor_count = 2
 
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda i: FakeProps)
@@ -122,14 +122,20 @@ def test_collect_cuda_devices_handles_memory_errors(monkeypatch):
 
 def test_query_nvidia_smi_parses(monkeypatch):
     # Ensure shutil.which reports nvidia-smi exists
-    monkeypatch.setattr(shutil, "which", lambda x: "/usr/bin/nvidia-smi" if x == "nvidia-smi" else None)
+    monkeypatch.setattr(
+        shutil, "which", lambda x: "/usr/bin/nvidia-smi" if x == "nvidia-smi" else None
+    )
 
     class CP:
         def __init__(self, stdout):
             self.returncode = 0
             self.stdout = stdout
 
-    monkeypatch.setattr(gpu_utils, "_safe_subprocess_run", lambda *a, **k: CP("GPU 0: FakeGPU\nGPU 1: OtherGPU"))
+    monkeypatch.setattr(
+        gpu_utils,
+        "_safe_subprocess_run",
+        lambda *a, **k: CP("GPU 0: FakeGPU\nGPU 1: OtherGPU"),
+    )
     parsed = gpu_utils._query_nvidia_smi()
     assert isinstance(parsed, list)
     assert "GPU 0: FakeGPU" in parsed
@@ -189,7 +195,9 @@ def test_print_gpu_info_with_devices(monkeypatch, caplog):
     }
 
     gpu_utils.print_gpu_info(info)
-    assert any("CUDA available" in r.message or "GPU 0" in r.message for r in caplog.records)
+    assert any(
+        "CUDA available" in r.message or "GPU 0" in r.message for r in caplog.records
+    )
 
 
 def test_get_optimal_device_prefers_gpu(monkeypatch):
@@ -199,7 +207,11 @@ def test_get_optimal_device_prefers_gpu(monkeypatch):
 
 def test_print_gpu_verbose(monkeypatch, caplog):
     # Monkeypatch detect_gpu_info to return a device list
-    monkeypatch.setattr(gpu_utils, "detect_gpu_info", lambda: {"devices": [{"name": "X", "total_memory_gb": 4.0}]})
+    monkeypatch.setattr(
+        gpu_utils,
+        "detect_gpu_info",
+        lambda: {"devices": [{"name": "X", "total_memory_gb": 4.0}]},
+    )
     dev = type("D", (), {"index": 0})()
     gpu_utils._print_gpu_verbose(dev)
     assert any("GPU" in r.message or "Memory" in r.message for r in caplog.records)
@@ -215,7 +227,11 @@ def test_detect_external_gpu_windows(monkeypatch):
             self.returncode = 0
             self.stdout = stdout
 
-    monkeypatch.setattr(gpu_utils, "_safe_subprocess_run", lambda *a, **k: CP("ParentDevice|Thunderbolt"))
+    monkeypatch.setattr(
+        gpu_utils,
+        "_safe_subprocess_run",
+        lambda *a, **k: CP("ParentDevice|Thunderbolt"),
+    )
 
     is_ext, conn = gpu_utils._detect_external_gpu_windows(0, "FakeGPU")
     assert is_ext is True
@@ -232,7 +248,10 @@ def test_detect_external_gpu_linux(monkeypatch):
             self.stdout = stdout
 
     # lspci output with VGA line followed by thunderbolt indicator
-    out = "00:02.0 VGA compatible controller: Fake Vendor\n\tSubsystem: Something\n\tThunderbolt: present"
+    out = (
+        "00:02.0 VGA compatible controller: Fake Vendor\n"
+        "\tSubsystem: Something\n\tThunderbolt: present"
+    )
     monkeypatch.setattr(gpu_utils, "_safe_subprocess_run", lambda *a, **k: CP(out))
 
     is_ext, conn = gpu_utils._detect_external_gpu_linux()
@@ -249,7 +268,11 @@ def test_detect_external_gpu_darwin(monkeypatch):
             self.returncode = 0
             self.stdout = stdout
 
-    monkeypatch.setattr(gpu_utils, "_safe_subprocess_run", lambda *a, **k: CP("eGPU connected via Thunderbolt"))
+    monkeypatch.setattr(
+        gpu_utils,
+        "_safe_subprocess_run",
+        lambda *a, **k: CP("eGPU connected via Thunderbolt"),
+    )
 
     is_ext, conn = gpu_utils._detect_external_gpu_darwin()
     assert is_ext is True
@@ -273,11 +296,15 @@ def test_collect_cuda_devices_external_flag(monkeypatch):
         name = "FakeGPU"
         major = 7
         minor = 5
-        total_memory = 8 * 1024 ** 3
+        total_memory = 8 * 1024**3
         multi_processor_count = 16
 
-    monkeypatch.setattr(gpu_utils.torch.cuda, "get_device_properties", lambda i: FakeProps)
-    monkeypatch.setattr(gpu_utils, "_detect_external_gpu", lambda i, n: (True, "Thunderbolt"))
+    monkeypatch.setattr(
+        gpu_utils.torch.cuda, "get_device_properties", lambda i: FakeProps
+    )
+    monkeypatch.setattr(
+        gpu_utils, "_detect_external_gpu", lambda i, n: (True, "Thunderbolt")
+    )
     monkeypatch.setattr(gpu_utils.torch.cuda, "memory_allocated", lambda i: 0)
     monkeypatch.setattr(gpu_utils.torch.cuda, "memory_reserved", lambda i: 0)
 
@@ -291,11 +318,15 @@ def test_configure_device_for_training_cuda(monkeypatch):
     # Test configure_device_for_training with CUDA available
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
-    monkeypatch.setattr(gpu_utils, "detect_gpu_info", lambda: {
-        "available": True,
-        "recommended_device": "cuda",
-        "devices": [{"name": "FakeGPU", "total_memory_gb": 8.0}]
-    })
+    monkeypatch.setattr(
+        gpu_utils,
+        "detect_gpu_info",
+        lambda: {
+            "available": True,
+            "recommended_device": "cuda",
+            "devices": [{"name": "FakeGPU", "total_memory_gb": 8.0}],
+        },
+    )
     dev = gpu_utils.configure_device_for_training(verbose=True)
     assert dev.type == "cuda"
 
@@ -310,10 +341,17 @@ def test_configure_device_for_training_gpu_id(monkeypatch):
     # Test configure_device_for_training with explicit gpu_id
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
-    monkeypatch.setattr(gpu_utils, "detect_gpu_info", lambda: {
-        "available": True,
-        "devices": [{"name": "GPU0", "total_memory_gb": 8.0}, {"name": "GPU1", "total_memory_gb": 8.0}]
-    })
+    monkeypatch.setattr(
+        gpu_utils,
+        "detect_gpu_info",
+        lambda: {
+            "available": True,
+            "devices": [
+                {"name": "GPU0", "total_memory_gb": 8.0},
+                {"name": "GPU1", "total_memory_gb": 8.0},
+            ],
+        },
+    )
     dev = gpu_utils.configure_device_for_training(gpu_id=1, verbose=True)
     assert dev.type == "cuda"
     assert dev.index == 1
@@ -374,7 +412,9 @@ def test_detect_external_gpu_linux_pcie_external(monkeypatch):
 
     class CP:
         returncode = 0
-        stdout = "00:02.0 VGA compatible controller: NVIDIA\n\tFlags: External enclosure"
+        stdout = (
+            "00:02.0 VGA compatible controller: NVIDIA\n\tFlags: External enclosure"
+        )
 
     monkeypatch.setattr(gpu_utils, "_safe_subprocess_run", lambda *a, **k: CP())
     is_ext, conn = gpu_utils._detect_external_gpu_linux()
@@ -432,7 +472,7 @@ def test_detect_gpu_info_cuda_with_cudnn(monkeypatch):
         name = "FakeGPU"
         major = 8
         minor = 0
-        total_memory = 8 * 1024 ** 3
+        total_memory = 8 * 1024**3
         multi_processor_count = 64
 
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda i: FakeProps)
@@ -570,7 +610,11 @@ def test_print_gpu_verbose_empty_devices(monkeypatch, caplog):
 
 def test_print_gpu_verbose_index_out_of_range(monkeypatch, caplog):
     # Test _print_gpu_verbose when device index > available devices
-    monkeypatch.setattr(gpu_utils, "detect_gpu_info", lambda: {"devices": [{"name": "GPU0", "total_memory_gb": 8.0}]})
+    monkeypatch.setattr(
+        gpu_utils,
+        "detect_gpu_info",
+        lambda: {"devices": [{"name": "GPU0", "total_memory_gb": 8.0}]},
+    )
     dev = type("D", (), {"index": 5})()
     gpu_utils._print_gpu_verbose(dev)
     # Should not crash
@@ -596,7 +640,7 @@ def test_get_nvml_info_with_string_returns(monkeypatch):
     import sys
 
     class FakeMem:
-        total = 8 * 1024 ** 3
+        total = 8 * 1024**3
 
     class FakeNV:
         NVMLError = Exception
@@ -634,4 +678,3 @@ def test_populate_nvidia_smi_info_empty():
     gpu_utils._populate_nvidia_smi_info(info, [])
     assert info["nvidia_smi"] is False
     assert info["nvidia_gpus"] == []
-

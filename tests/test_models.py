@@ -126,7 +126,9 @@ class TestTextEncoder:
         assert cls_token is not None
         assert sequence_output is not None
 
-    def test_text_encoder_with_token_type_ids(self, text_encoder_config, batch_size, seq_length):
+    def test_text_encoder_with_token_type_ids(
+        self, text_encoder_config, batch_size, seq_length
+    ):
         """Test text encoder forward pass with token_type_ids (segment embeddings)."""
         encoder = create_text_encoder(text_encoder_config)
         encoder.eval()
@@ -135,7 +137,7 @@ class TestTextEncoder:
         attention_mask = torch.ones(batch_size, seq_length)
         # Segment IDs: 0 for first half, 1 for second half
         token_type_ids = torch.zeros(batch_size, seq_length, dtype=torch.long)
-        token_type_ids[:, seq_length // 2:] = 1
+        token_type_ids[:, seq_length // 2 :] = 1
 
         with torch.no_grad():
             cls_token, sequence_output = encoder(
@@ -145,7 +147,11 @@ class TestTextEncoder:
             )
 
         assert cls_token.shape == (batch_size, text_encoder_config["hidden_dim"])
-        assert sequence_output.shape == (batch_size, seq_length, text_encoder_config["hidden_dim"])
+        assert sequence_output.shape == (
+            batch_size,
+            seq_length,
+            text_encoder_config["hidden_dim"],
+        )
 
     def test_text_encoder_without_cls_token(self, batch_size):
         """Test text encoder with use_cls_token=False (mean pooling)."""
@@ -165,7 +171,7 @@ class TestTextEncoder:
         input_ids = torch.randint(0, 1000, (batch_size, seq_len))
         attention_mask = torch.ones(batch_size, seq_len)
         # Mask out some tokens
-        attention_mask[:, seq_len // 2:] = 0
+        attention_mask[:, seq_len // 2 :] = 0
 
         with torch.no_grad():
             pooled, sequence_output = encoder(
@@ -211,8 +217,7 @@ class TestTextEncoder:
 
         # Create new embeddings and set
         new_embeddings = torch.nn.Embedding(
-            text_encoder_config["vocab_size"],
-            text_encoder_config["hidden_dim"]
+            text_encoder_config["vocab_size"], text_encoder_config["hidden_dim"]
         )
         encoder.set_input_embeddings(new_embeddings)
         assert encoder.get_input_embeddings() is new_embeddings
@@ -224,6 +229,7 @@ class TestSimpleTokenizer:
     def test_tokenizer_creation(self):
         """Test tokenizer can be created."""
         from src.models.text_encoder import SimpleTokenizer
+
         tokenizer = SimpleTokenizer(vocab_size=30522)
         assert tokenizer.vocab_size == 30522
         assert tokenizer.pad_token_id == 0
@@ -234,6 +240,7 @@ class TestSimpleTokenizer:
     def test_tokenizer_encode(self):
         """Test tokenizer encode method."""
         from src.models.text_encoder import SimpleTokenizer
+
         tokenizer = SimpleTokenizer(vocab_size=30522)
 
         result = tokenizer.encode("Hello world", max_length=32)
@@ -249,12 +256,16 @@ class TestSimpleTokenizer:
         # Check attention mask: 1s for real tokens, 0s for padding
         # "Hello world" = 11 chars + CLS + SEP = 13 tokens
         expected_real_tokens = 13
-        assert result["attention_mask"][0, :expected_real_tokens].sum().item() == expected_real_tokens
+        assert (
+            result["attention_mask"][0, :expected_real_tokens].sum().item()
+            == expected_real_tokens
+        )
         assert result["attention_mask"][0, expected_real_tokens:].sum().item() == 0
 
     def test_tokenizer_encode_long_text(self):
         """Test tokenizer truncates long text."""
         from src.models.text_encoder import SimpleTokenizer
+
         tokenizer = SimpleTokenizer()
 
         long_text = "a" * 1000
@@ -360,7 +371,9 @@ class TestDoubleLoopController:
         assert controller.step_count == 0
         assert len(controller.loss_history) == 0
 
-    def test_controller_compute_meta_gradient(self, double_loop_config, batch_size, hidden_dim):
+    def test_controller_compute_meta_gradient(
+        self, double_loop_config, batch_size, hidden_dim
+    ):
         """Test controller compute_meta_gradient method."""
         from src.models import create_double_loop_controller
 
@@ -383,7 +396,9 @@ class TestDoubleLoopController:
         assert "loss_variance" in meta_metrics
         assert "accuracy_variance" in meta_metrics
 
-    def test_controller_hidden_state_persistence(self, double_loop_config, batch_size, hidden_dim):
+    def test_controller_hidden_state_persistence(
+        self, double_loop_config, batch_size, hidden_dim
+    ):
         """Test that hidden states persist across forward calls."""
         from src.models import create_double_loop_controller
 
@@ -411,14 +426,14 @@ class TestDoubleLoopController:
         from src.models import create_double_loop_controller
 
         controller = create_double_loop_controller(double_loop_config)
-        
+
         # Initially step_count is 0, should return True (0 % update_frequency == 0)
         assert controller.should_update_meta() is True
-        
+
         # Increment step count manually
         controller.step_count = 5
         assert controller.should_update_meta() is False
-        
+
         # At update_frequency multiple, should return True
         controller.step_count = double_loop_config["update_frequency"]
         assert controller.should_update_meta() is True
@@ -429,13 +444,13 @@ class TestDoubleLoopController:
 
         controller = create_double_loop_controller(double_loop_config)
         dummy_model = torch.nn.Linear(10, 10)
-        
+
         # Add more than 1000 entries to history
         for i in range(1100):
             loss = torch.tensor(float(i) / 1100)
             accuracy = torch.tensor(float(i) / 1100)
             controller.compute_meta_gradient(dummy_model, loss, accuracy)
-        
+
         # History should be limited to 1000
         assert len(controller.loss_history) <= 1000
         assert len(controller.accuracy_history) <= 1000
@@ -672,7 +687,7 @@ class TestMultiModalModel:
         """Test enabling gradient checkpointing."""
         model = create_multi_modal_model(model_config)
         model.enable_gradient_checkpointing()
-        
+
         # Should not raise
         assert True
 
@@ -683,7 +698,7 @@ class TestMultiModalModel:
         late_config["model"] = model_config["model"].copy()
         late_config["model"]["fusion"] = model_config["model"]["fusion"].copy()
         late_config["model"]["fusion"]["type"] = "late"
-        
+
         model = create_multi_modal_model(late_config)
         model.eval()
 
@@ -696,7 +711,9 @@ class TestMultiModalModel:
 
         assert "logits" in outputs
 
-    def test_model_with_double_loop_controller(self, model_config, sample_images, sample_text_inputs):
+    def test_model_with_double_loop_controller(
+        self, model_config, sample_images, sample_text_inputs
+    ):
         """Test model with double-loop controller."""
         dl_config = model_config.copy()
         dl_config["model"] = model_config["model"].copy()
@@ -706,7 +723,7 @@ class TestMultiModalModel:
             "meta_window": 5,
             "output_dim": 16,
         }
-        
+
         model = create_multi_modal_model(dl_config)
         model.eval()
 
@@ -719,8 +736,13 @@ class TestMultiModalModel:
 
         assert "logits" in outputs
 
-    def test_model_with_double_loop_controller_training(self, model_config, sample_images, sample_text_inputs, batch_size):
-        """Test model with double-loop controller during training with controller inputs."""
+    def test_model_with_double_loop_controller_training(
+        self, model_config, sample_images, sample_text_inputs, batch_size
+    ):
+        """Test model with double-loop controller during training.
+
+        Uses controller inputs.
+        """
         dl_config = model_config.copy()
         dl_config["model"] = model_config["model"].copy()
         dl_config["model"]["use_double_loop"] = True
@@ -730,7 +752,7 @@ class TestMultiModalModel:
             "hidden_dim": 64,
             "update_frequency": 10,
         }
-        
+
         model = create_multi_modal_model(dl_config)
         model.train()
 
@@ -755,8 +777,13 @@ class TestMultiModalModel:
             assert "lr_scale" in outputs["meta_info"]
             assert "arch_adaptation" in outputs["meta_info"]
 
-    def test_model_with_double_loop_controller_no_inputs(self, model_config, sample_images, sample_text_inputs):
-        """Test model with double-loop controller during training without controller inputs."""
+    def test_model_with_double_loop_controller_no_inputs(
+        self, model_config, sample_images, sample_text_inputs
+    ):
+        """Test model with double-loop controller during training.
+
+        Without controller inputs.
+        """
         dl_config = model_config.copy()
         dl_config["model"] = model_config["model"].copy()
         dl_config["model"]["use_double_loop"] = True
@@ -765,7 +792,7 @@ class TestMultiModalModel:
             "model_hidden_dim": model_config["model"]["vision_encoder"]["hidden_dim"],
             "hidden_dim": 64,
         }
-        
+
         model = create_multi_modal_model(dl_config)
         model.train()
 
@@ -780,7 +807,9 @@ class TestMultiModalModel:
         # Without controller inputs, meta_info should be None
         assert outputs.get("meta_info") is None
 
-    def test_model_with_contrastive_head(self, model_config, sample_images, sample_text_inputs):
+    def test_model_with_contrastive_head(
+        self, model_config, sample_images, sample_text_inputs
+    ):
         """Test model with contrastive head."""
         contrastive_config = model_config.copy()
         contrastive_config["model"] = model_config["model"].copy()
@@ -789,7 +818,7 @@ class TestMultiModalModel:
             "hidden_dim": model_config["model"]["vision_encoder"]["hidden_dim"],
             "projection_dim": 128,
         }
-        
+
         model = create_multi_modal_model(contrastive_config)
         model.eval()
 
@@ -839,41 +868,45 @@ class TestLoadPretrainedWeights:
         from src.models.multi_modal_model import load_pretrained_weights
 
         model = create_multi_modal_model(model_config)
-        
+
         # No checkpoints - should return model unchanged
         result = load_pretrained_weights(model)
         assert result is model
 
-    def test_load_pretrained_weights_valid_vision_checkpoint(self, model_config, tmp_path):
+    def test_load_pretrained_weights_valid_vision_checkpoint(
+        self, model_config, tmp_path
+    ):
         """Test load_pretrained_weights with valid vision checkpoint."""
         from src.models.multi_modal_model import load_pretrained_weights
 
         model = create_multi_modal_model(model_config)
-        
+
         # Save vision encoder state dict
         checkpoint_path = tmp_path / "vision_checkpoint.pt"
         torch.save(model.vision_encoder.state_dict(), checkpoint_path)
-        
+
         # Create new model and load vision weights
         model2 = create_multi_modal_model(model_config)
         result = load_pretrained_weights(model2, vision_checkpoint=str(checkpoint_path))
-        
+
         assert result is model2
 
-    def test_load_pretrained_weights_valid_text_checkpoint(self, model_config, tmp_path):
+    def test_load_pretrained_weights_valid_text_checkpoint(
+        self, model_config, tmp_path
+    ):
         """Test load_pretrained_weights with valid text checkpoint."""
         from src.models.multi_modal_model import load_pretrained_weights
 
         model = create_multi_modal_model(model_config)
-        
+
         # Save text encoder state dict
         checkpoint_path = tmp_path / "text_checkpoint.pt"
         torch.save(model.text_encoder.state_dict(), checkpoint_path)
-        
+
         # Create new model and load text weights
         model2 = create_multi_modal_model(model_config)
         result = load_pretrained_weights(model2, text_checkpoint=str(checkpoint_path))
-        
+
         assert result is model2
 
     def test_load_pretrained_weights_both_checkpoints(self, model_config, tmp_path):
@@ -881,19 +914,17 @@ class TestLoadPretrainedWeights:
         from src.models.multi_modal_model import load_pretrained_weights
 
         model = create_multi_modal_model(model_config)
-        
+
         # Save both encoder state dicts
         vision_path = tmp_path / "vision.pt"
         text_path = tmp_path / "text.pt"
         torch.save(model.vision_encoder.state_dict(), vision_path)
         torch.save(model.text_encoder.state_dict(), text_path)
-        
+
         # Create new model and load both weights
         model2 = create_multi_modal_model(model_config)
         result = load_pretrained_weights(
-            model2, 
-            vision_checkpoint=str(vision_path),
-            text_checkpoint=str(text_path)
+            model2, vision_checkpoint=str(vision_path), text_checkpoint=str(text_path)
         )
-        
+
         assert result is model2

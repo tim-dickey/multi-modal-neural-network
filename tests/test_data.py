@@ -527,7 +527,7 @@ class TestCreateDatasetFromConfig:
     def test_create_dataset_from_config_unknown(self):
         """Test error on unknown dataset."""
         config = {"data": {"train_dataset": "unknown_dataset"}}
-        
+
         with pytest.raises(ValueError, match="Unknown dataset"):
             create_dataset_from_config(config)
 
@@ -540,11 +540,11 @@ class TestCreateDatasetFromConfig:
         for split in ["train", "val"]:
             split_dir = temp_data_dir / split
             split_dir.mkdir()
-            
+
             for class_id in range(2):
                 class_dir = split_dir / f"n{class_id:08d}"
                 class_dir.mkdir()
-                
+
                 img = Image.fromarray(
                     np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
                 )
@@ -560,11 +560,11 @@ class TestCreateDatasetFromConfig:
                 "vision_encoder": {
                     "img_size": 64,
                 }
-            }
+            },
         }
-        
+
         train_ds, val_ds = create_dataset_from_config(config)
-        
+
         assert len(train_ds) > 0
         assert len(val_ds) > 0
 
@@ -578,29 +578,33 @@ class TestCreateDatasetFromConfig:
         for split in ["train", "val"]:
             images_dir = temp_data_dir / f"{split}2017"
             images_dir.mkdir()
-            
+
             annotations = {"images": [], "annotations": []}
-            
+
             for i in range(2):
                 img = Image.fromarray(
                     np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
                 )
                 img_path = images_dir / f"{i:012d}.jpg"
                 img.save(img_path)
-                
-                annotations["images"].append({
-                    "id": i,
-                    "file_name": f"{i:012d}.jpg",
-                })
-                annotations["annotations"].append({
-                    "id": i,
-                    "image_id": i,
-                    "caption": f"Test caption {i}",
-                })
-            
+
+                annotations["images"].append(
+                    {
+                        "id": i,
+                        "file_name": f"{i:012d}.jpg",
+                    }
+                )
+                annotations["annotations"].append(
+                    {
+                        "id": i,
+                        "image_id": i,
+                        "caption": f"Test caption {i}",
+                    }
+                )
+
             annotations_dir = temp_data_dir / "annotations"
             annotations_dir.mkdir(exist_ok=True)
-            
+
             with open(annotations_dir / f"captions_{split}2017.json", "w") as f:
                 json.dump(annotations, f)
 
@@ -613,11 +617,11 @@ class TestCreateDatasetFromConfig:
                 "vision_encoder": {
                     "img_size": 64,
                 }
-            }
+            },
         }
-        
+
         train_ds, val_ds = create_dataset_from_config(config)
-        
+
         assert len(train_ds) > 0
         assert len(val_ds) > 0
 
@@ -645,12 +649,14 @@ class TestMultiModalDatasetWithTokenizer:
             img_path = images_dir / f"image_{i}.jpg"
             img.save(img_path)
 
-            annotations.append({
-                "image_id": i,
-                "image_path": str(img_path),
-                "caption": f"Test caption {i}",
-                "label": i,
-            })
+            annotations.append(
+                {
+                    "image_id": i,
+                    "image_path": str(img_path),
+                    "caption": f"Test caption {i}",
+                    "label": i,
+                }
+            )
 
         with open(annotations_file, "w") as f:
             json.dump(annotations, f)

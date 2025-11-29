@@ -19,7 +19,11 @@ class TestSafeSubprocessRun:
         assert res is None
 
     def test_safe_subprocess_run_success(self, monkeypatch):
-        """When executable exists and subprocess.run returns a CompletedProcess, return it."""
+        """Test subprocess.run success case.
+
+        When executable exists and subprocess.run returns a
+        CompletedProcess, return it.
+        """
         monkeypatch.setattr(subprocess_utils.shutil, "which", lambda x: "/bin/true")
 
         class CP:
@@ -46,8 +50,18 @@ class TestSafeSubprocessRun:
         """Simulate a timeout being raised by subprocess.run."""
         monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/fakecmd")
 
-        def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False, cwd=None, **kwargs):
-            raise subprocess.TimeoutExpired("fakecmd", timeout)  # nosec B603 - test mock
+        def fake_run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=1,
+            check=False,
+            cwd=None,
+            **kwargs,
+        ):
+            raise subprocess.TimeoutExpired(
+                "fakecmd", timeout
+            )  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
@@ -92,7 +106,9 @@ class TestSafeSubprocessRun:
         def fake_run(_cmd, cwd=None, **_kwargs):
             nonlocal cwd_used
             cwd_used = cwd
-            return subprocess.CompletedProcess(args=["fakecmd"], returncode=0, stdout="ok")  # nosec B603 - test mock
+            return subprocess.CompletedProcess(
+                args=["fakecmd"], returncode=0, stdout="ok"
+            )  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
@@ -110,11 +126,12 @@ class TestSafeSubprocessRun:
         def fake_run(cmd, **kwargs):
             nonlocal cmd_used
             cmd_used = cmd
-            return subprocess.CompletedProcess(args=["cmd"], returncode=0, stdout="ok")  # nosec B603 - test mock
+            return subprocess.CompletedProcess(
+                args=["cmd"], returncode=0, stdout="ok"
+            )  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
         res = _safe_subprocess_run(["cmd", "--version", "-v"], timeout=1)
         assert res is not None
         assert cmd_used == ["/usr/bin/cmd", "--version", "-v"]
-

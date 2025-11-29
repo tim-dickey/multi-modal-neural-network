@@ -29,7 +29,6 @@ from src.utils.config import (
     validate_config,
 )
 
-
 # ============================================================================
 # DATA PIPELINE INTEGRATION TESTS
 # ============================================================================
@@ -75,9 +74,7 @@ class TestDataPipelineIntegration:
         model.eval()
 
         with torch.no_grad():
-            outputs = model(
-                batch["image"], batch["input_ids"], batch["attention_mask"]
-            )
+            outputs = model(batch["image"], batch["input_ids"], batch["attention_mask"])
 
         assert "logits" in outputs
         assert outputs["logits"].shape[0] == 2
@@ -86,8 +83,7 @@ class TestDataPipelineIntegration:
         """Test that train/val transforms produce consistent tensor shapes."""
         # Create annotation file
         annotations = [
-            {"image_path": "img.jpg", "caption": "Test", "label": 0}
-            for _ in range(10)
+            {"image_path": "img.jpg", "caption": "Test", "label": 0} for _ in range(10)
         ]
         with open(temp_data_dir / "annotations.json", "w") as f:
             json.dump(annotations, f)
@@ -139,7 +135,11 @@ class TestDataPipelineIntegration:
         # Create annotation files
         for split in ["train", "val"]:
             annotations = [
-                {"image_path": f"{split}_{i}.jpg", "caption": f"{split} {i}", "label": i}
+                {
+                    "image_path": f"{split}_{i}.jpg",
+                    "caption": f"{split} {i}",
+                    "label": i,
+                }
                 for i in range(4)
             ]
             with open(temp_data_dir / f"{split}.json", "w") as f:
@@ -279,7 +279,11 @@ class TestConfigToTrainingIntegration:
                     "num_layers": 2,
                     "num_heads": 4,
                 },
-                "heads": {"type": "classification", "hidden_dim": 256, "num_classes": 10},
+                "heads": {
+                    "type": "classification",
+                    "hidden_dim": 256,
+                    "num_classes": 10,
+                },
                 "double_loop": {"hidden_dim": 128, "meta_lr": 1e-5},
                 "use_double_loop": False,
             },
@@ -390,8 +394,17 @@ class TestConfigToTrainingIntegration:
                     "mlp_ratio": 2.0,
                     "dropout": 0.1,
                 },
-                "fusion": {"type": "early", "hidden_dim": 128, "num_layers": 1, "num_heads": 2},
-                "heads": {"type": "classification", "hidden_dim": 128, "num_classes": 5},
+                "fusion": {
+                    "type": "early",
+                    "hidden_dim": 128,
+                    "num_layers": 1,
+                    "num_heads": 2,
+                },
+                "heads": {
+                    "type": "classification",
+                    "hidden_dim": 128,
+                    "num_classes": 5,
+                },
                 "double_loop": {"hidden_dim": 64, "meta_lr": 1e-5},
                 "use_double_loop": False,
             },
@@ -1077,7 +1090,11 @@ class TestDataSelectorIntegration:
         # Create annotations for each
         for ds_dir, prefix in [(ds1_dir, "ds1"), (ds2_dir, "ds2")]:
             annotations = [
-                {"image_path": f"{prefix}_{i}.jpg", "caption": f"{prefix} caption {i}", "label": i % 5}
+                {
+                    "image_path": f"{prefix}_{i}.jpg",
+                    "caption": f"{prefix} caption {i}",
+                    "label": i % 5,
+                }
                 for i in range(10)
             ]
             with open(ds_dir / "annotations.json", "w") as f:
@@ -1195,8 +1212,17 @@ class TestFullPipelineIntegration:
                     "mlp_ratio": 2.0,
                     "dropout": 0.0,
                 },
-                "fusion": {"type": "early", "hidden_dim": 128, "num_layers": 1, "num_heads": 2},
-                "heads": {"type": "classification", "hidden_dim": 128, "num_classes": 10},
+                "fusion": {
+                    "type": "early",
+                    "hidden_dim": 128,
+                    "num_layers": 1,
+                    "num_heads": 2,
+                },
+                "heads": {
+                    "type": "classification",
+                    "hidden_dim": 128,
+                    "num_classes": 10,
+                },
                 "double_loop": {"hidden_dim": 64, "meta_lr": 1e-5},
                 "use_double_loop": False,
             },
@@ -1234,7 +1260,9 @@ class TestFullPipelineIntegration:
         assert "logits" in outputs
         assert outputs["logits"].shape == (1, 10)
 
-    def test_training_with_validation_logging(self, model_config, temp_output_dir, temp_data_dir):
+    def test_training_with_validation_logging(
+        self, model_config, temp_output_dir, temp_data_dir
+    ):
         """Test training loop with validation and logging integration."""
         from src.models import create_multi_modal_model
         from src.training.trainer import Trainer
@@ -1320,7 +1348,9 @@ class TestFullPipelineIntegration:
 class TestCrossModuleIntegration:
     """Tests verifying integration between different module groups."""
 
-    def test_data_to_model_to_training(self, model_config, temp_data_dir, temp_output_dir):
+    def test_data_to_model_to_training(
+        self, model_config, temp_data_dir, temp_output_dir
+    ):
         """Test data pipeline feeds correctly into model and training."""
         from src.models import create_multi_modal_model
         from src.training.losses import create_loss_function
@@ -1384,7 +1414,11 @@ class TestCrossModuleIntegration:
                     "max_seq_length": 128,
                 },
                 "fusion": {"type": "early", "hidden_dim": 256},
-                "heads": {"type": "classification", "hidden_dim": 256, "num_classes": 10},
+                "heads": {
+                    "type": "classification",
+                    "hidden_dim": 256,
+                    "num_classes": 10,
+                },
                 "double_loop": {"hidden_dim": 128},
             },
             "training": {"max_epochs": 10, "inner_lr": 1e-3, "optimizer": "adamw"},

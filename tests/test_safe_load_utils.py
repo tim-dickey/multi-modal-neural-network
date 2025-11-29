@@ -5,7 +5,6 @@ import torch
 from src.utils import safe_load
 
 
-
 def test_safe_load_rejects_remote_url():
     import pytest
 
@@ -27,6 +26,7 @@ def test_safe_load_torch_file(tmp_path):
 def test_safe_load_safetensors_path(monkeypatch, tmp_path):
     # Simulate safetensors loader being available
     mod = type("M", (), {})()
+
     def fake_load_file(path, device="cpu"):
         return {"a": torch.tensor([1])}
 
@@ -119,7 +119,9 @@ def test_torch_load_returns_non_dict(monkeypatch, tmp_path):
     p = tmp_path / "ckpt3.pt"
     p.write_bytes(b"x")
 
-    monkeypatch.setattr(safe_load.torch, "load", lambda path, map_location=None: [1, 2, 3])
+    monkeypatch.setattr(
+        safe_load.torch, "load", lambda path, map_location=None: [1, 2, 3]
+    )
 
     import pytest
 
@@ -188,7 +190,9 @@ def test_safe_load_untrusted_path_rejected(monkeypatch, tmp_path):
     # Since we can't easily mock Path behavior, test with allow_external=True
     # and verify the error message when rejecting
     with pytest.raises(ValueError, match="untrusted paths"):
-        safe_load.safe_load_checkpoint("/completely/external/path/model.pt", allow_external=False)
+        safe_load.safe_load_checkpoint(
+            "/completely/external/path/model.pt", allow_external=False
+        )
 
 
 def test_safe_load_allow_external_true(monkeypatch, tmp_path):
@@ -273,11 +277,17 @@ def test_torch_load_with_map_location(tmp_path):
 
 def test_expected_keys_subset_passes(tmp_path):
     # Test that expected_keys works when all keys present
-    data = {"model": torch.tensor([1.0]), "optimizer": torch.tensor([2.0]), "extra": 123}
+    data = {
+        "model": torch.tensor([1.0]),
+        "optimizer": torch.tensor([2.0]),
+        "extra": 123,
+    }
     p = tmp_path / "full_ckpt.pt"
     torch.save(data, p)
 
-    loaded = safe_load.safe_load_checkpoint(str(p), expected_keys={"model", "optimizer"})
+    loaded = safe_load.safe_load_checkpoint(
+        str(p), expected_keys={"model", "optimizer"}
+    )
     assert "model" in loaded
     assert "optimizer" in loaded
 
@@ -290,7 +300,9 @@ def test_expected_keys_partial_missing(tmp_path):
     torch.save(data, p)
 
     with pytest.raises(ValueError, match="missing expected keys"):
-        safe_load.safe_load_checkpoint(str(p), expected_keys={"model", "optimizer", "scheduler"})
+        safe_load.safe_load_checkpoint(
+            str(p), expected_keys={"model", "optimizer", "scheduler"}
+        )
 
 
 def test_safe_load_pth_extension(tmp_path):
@@ -382,4 +394,3 @@ def test_resolve_path_exception(monkeypatch, tmp_path):
     # The file exists and should load normally
     loaded = safe_load.safe_load_checkpoint(str(p))
     assert isinstance(loaded, dict)
-

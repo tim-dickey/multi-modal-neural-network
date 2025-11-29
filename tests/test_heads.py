@@ -35,20 +35,27 @@ def test_multilabel_and_contrastive_and_task_factory():
     assert sim.shape == (3, 3)
 
     # Sequence generation: with target ids
-    seq = SequenceGenerationHead(hidden_dim=64, vocab_size=100, max_seq_length=10, num_layers=1, num_heads=2)
+    seq = SequenceGenerationHead(
+        hidden_dim=64, vocab_size=100, max_seq_length=10, num_layers=1, num_heads=2
+    )
     encoder_out = torch.randn(2, 5, 64)
     target_ids = torch.randint(0, 100, (2, 3))
     logits = seq(encoder_out, target_ids=target_ids)
     assert logits.shape == (2, 3, 100)
 
     # Factory
-    h = create_task_head({"type": "classification", "hidden_dim": 128, "num_classes": 7})
+    h = create_task_head(
+        {"type": "classification", "hidden_dim": 128, "num_classes": 7}
+    )
     assert h(torch.randn(1, 128)).shape == (1, 7)
 
 
 def test_multitask_head_combination():
     features = torch.randn(2, 512)
-    tasks = {"a": {"type": "classification", "num_classes": 3}, "b": {"type": "regression", "output_dim": 2}}
+    tasks = {
+        "a": {"type": "classification", "num_classes": 3},
+        "b": {"type": "regression", "output_dim": 2},
+    }
     mt = MultiTaskHead(hidden_dim=512, tasks=tasks)
     out_all = mt(features)
     assert set(out_all.keys()) == set(["a", "b"])

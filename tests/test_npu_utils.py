@@ -8,7 +8,11 @@ def test_detect_external_npu_linux(monkeypatch):
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Linux")
 
     # Pretend lsusb exists and returns Coral in stdout
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x in ("lsusb", "lspci") else None)
+    monkeypatch.setattr(
+        npu_utils.shutil,
+        "which",
+        lambda x: "/usr/bin/lsusb" if x in ("lsusb", "lspci") else None,
+    )
 
     class CP:
         def __init__(self, stdout):
@@ -27,8 +31,13 @@ def test_detect_external_npu_linux(monkeypatch):
 
 
 def test_get_best_available_device_prefers_npu(monkeypatch):
-    # If detect_npu_info reports available, get_best_available_device should honor prefer_npu
-    monkeypatch.setattr(npu_utils, "detect_npu_info", lambda: {"available": True, "recommended_device": "openvino"})
+    # If detect_npu_info reports available, get_best_available_device
+    # should honor prefer_npu
+    monkeypatch.setattr(
+        npu_utils,
+        "detect_npu_info",
+        lambda: {"available": True, "recommended_device": "openvino"},
+    )
     dev = npu_utils.get_best_available_device(prefer_npu=True)
     assert dev == "openvino"
 
@@ -44,7 +53,11 @@ def test_detect_apple_neural_engine(monkeypatch):
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(npu_utils.platform, "machine", lambda: "arm64")
     # sysctl present
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/sbin/sysctl" if x == "sysctl" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil,
+        "which",
+        lambda x: "/usr/sbin/sysctl" if x == "sysctl" else None,
+    )
 
     class CP:
         def __init__(self, stdout):
@@ -75,7 +88,11 @@ def test_detect_intel_npu_openvino(monkeypatch):
     monkeypatch.setattr(npu_utils, "importlib", npu_utils.importlib)
     monkeypatch.setattr(npu_utils, "importlib", npu_utils.importlib)
     # Monkeypatch importlib.import_module used inside the module to return fake_mod
-    monkeypatch.setattr(npu_utils.importlib, "import_module", lambda name: fake_mod if name == "openvino" else __import__(name))
+    monkeypatch.setattr(
+        npu_utils.importlib,
+        "import_module",
+        lambda name: fake_mod if name == "openvino" else __import__(name),
+    )
 
     # Call detection helper directly (should execute without raising)
     res = npu_utils._detect_intel_npu()
@@ -90,7 +107,11 @@ def test_detect_external_npu_windows(monkeypatch):
             self.returncode = 0
             self.stdout = stdout
 
-    monkeypatch.setattr(npu_utils, "_run_powershell_pnp_probe", lambda *a, **k: CP("Google Coral Edge TPU"))
+    monkeypatch.setattr(
+        npu_utils,
+        "_run_powershell_pnp_probe",
+        lambda *a, **k: CP("Google Coral Edge TPU"),
+    )
     is_ext, name = npu_utils._detect_external_npu()
     assert is_ext is True
     assert name is not None
@@ -98,14 +119,20 @@ def test_detect_external_npu_windows(monkeypatch):
 
 def test_detect_external_npu_linux_pci(monkeypatch):
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x in ("lsusb", "lspci") else None)
+    monkeypatch.setattr(
+        npu_utils.shutil,
+        "which",
+        lambda x: "/usr/bin/lsusb" if x in ("lsusb", "lspci") else None,
+    )
 
     class CP:
         def __init__(self, stdout):
             self.returncode = 0
             self.stdout = stdout
 
-    monkeypatch.setattr(npu_utils, "_safe_run", lambda *a, **k: CP("Hailo AI Accelerator"))
+    monkeypatch.setattr(
+        npu_utils, "_safe_run", lambda *a, **k: CP("Hailo AI Accelerator")
+    )
     is_ext, name = npu_utils._detect_external_npu()
     assert is_ext
     assert "Hailo" in name or "Coral" in name or "Movidius" in name
@@ -188,7 +215,9 @@ def test_get_best_available_device_cuda(monkeypatch):
 
     fake_torch = types.ModuleType("torch")
     fake_cuda = types.SimpleNamespace(is_available=lambda: True)
-    fake_backends = types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: False))
+    fake_backends = types.SimpleNamespace(
+        mps=types.SimpleNamespace(is_available=lambda: False)
+    )
     fake_torch.cuda = fake_cuda
     fake_torch.backends = fake_backends
 
@@ -231,7 +260,11 @@ def test_get_best_available_device_npu_fallback(monkeypatch):
     fake_torch.backends = fake_backends
 
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setattr(npu_utils, "detect_npu_info", lambda: {"available": True, "recommended_device": "openvino"})
+    monkeypatch.setattr(
+        npu_utils,
+        "detect_npu_info",
+        lambda: {"available": True, "recommended_device": "openvino"},
+    )
 
     dev = npu_utils.get_best_available_device(prefer_npu=False)
     assert dev == "openvino"
@@ -291,7 +324,9 @@ def test_external_npu_info_unknown():
 def test_detect_external_npu_darwin(monkeypatch):
     # Test macOS external NPU detection
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/sbin/system_profiler")
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/sbin/system_profiler"
+    )
 
     class CP:
         returncode = 0
@@ -306,7 +341,9 @@ def test_detect_external_npu_darwin(monkeypatch):
 def test_detect_external_npu_darwin_movidius(monkeypatch):
     # Test macOS Movidius detection
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/sbin/system_profiler")
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/sbin/system_profiler"
+    )
 
     class CP:
         returncode = 0
@@ -330,7 +367,11 @@ def test_detect_external_npu_darwin_no_profiler(monkeypatch):
 def test_detect_external_npu_linux_movidius(monkeypatch):
     # Test Linux Movidius detection via lsusb
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/" + x if x in ("lsusb", "lspci") else None)
+    monkeypatch.setattr(
+        npu_utils.shutil,
+        "which",
+        lambda x: "/usr/bin/" + x if x in ("lsusb", "lspci") else None,
+    )
 
     class CP:
         returncode = 0
@@ -504,7 +545,11 @@ def test_detect_amd_npu_ryzen_ai_sdk(monkeypatch):
     # Test AMD NPU detection via ryzen_ai SDK
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Linux")
     monkeypatch.setattr(npu_utils.platform, "processor", lambda: "Intel Core")
-    monkeypatch.setattr(npu_utils.importlib_util, "find_spec", lambda x: True if x == "ryzen_ai" else None)
+    monkeypatch.setattr(
+        npu_utils.importlib_util,
+        "find_spec",
+        lambda x: True if x == "ryzen_ai" else None,
+    )
     result = npu_utils._detect_amd_npu()
     assert result is True
 
@@ -566,8 +611,16 @@ def test_detect_windows_directml_npu_available(monkeypatch):
     fake_directml.device_count = lambda: 1
     fake_directml.device_name = lambda i: "Intel UHD Graphics"
 
-    monkeypatch.setattr(npu_utils.importlib_util, "find_spec", lambda x: True if x == "torch_directml" else None)
-    monkeypatch.setattr(npu_utils.importlib, "import_module", lambda x: fake_directml if x == "torch_directml" else __import__(x))
+    monkeypatch.setattr(
+        npu_utils.importlib_util,
+        "find_spec",
+        lambda x: True if x == "torch_directml" else None,
+    )
+    monkeypatch.setattr(
+        npu_utils.importlib,
+        "import_module",
+        lambda x: fake_directml if x == "torch_directml" else __import__(x),
+    )
 
     info = npu_utils._detect_windows_directml_npu()
     assert info["available"] is True
@@ -584,8 +637,16 @@ def test_detect_windows_directml_npu_no_devices(monkeypatch):
     fake_directml.is_available = lambda: True
     fake_directml.device_count = lambda: 0
 
-    monkeypatch.setattr(npu_utils.importlib_util, "find_spec", lambda x: True if x == "torch_directml" else None)
-    monkeypatch.setattr(npu_utils.importlib, "import_module", lambda x: fake_directml if x == "torch_directml" else __import__(x))
+    monkeypatch.setattr(
+        npu_utils.importlib_util,
+        "find_spec",
+        lambda x: True if x == "torch_directml" else None,
+    )
+    monkeypatch.setattr(
+        npu_utils.importlib,
+        "import_module",
+        lambda x: fake_directml if x == "torch_directml" else __import__(x),
+    )
 
     info = npu_utils._detect_windows_directml_npu()
     assert info["available"] is False
@@ -593,7 +654,9 @@ def test_detect_windows_directml_npu_no_devices(monkeypatch):
 
 def test_detect_npu_info_external_npu(monkeypatch):
     # Test detect_npu_info when external NPU detected
-    monkeypatch.setattr(npu_utils, "_detect_external_npu", lambda: (True, "Google Coral Edge TPU"))
+    monkeypatch.setattr(
+        npu_utils, "_detect_external_npu", lambda: (True, "Google Coral Edge TPU")
+    )
     info = npu_utils.detect_npu_info()
     assert info["available"] is True
     assert info["is_external"] is True
@@ -602,11 +665,15 @@ def test_detect_npu_info_external_npu(monkeypatch):
 def test_detect_npu_info_vendor_npu(monkeypatch):
     # Test detect_npu_info when vendor NPU detected
     monkeypatch.setattr(npu_utils, "_detect_external_npu", lambda: (False, None))
-    monkeypatch.setattr(npu_utils, "_vendor_npu_info", lambda: {
-        "available": True,
-        "npu_type": "Intel AI Boost",
-        "device_name": "Intel NPU",
-    })
+    monkeypatch.setattr(
+        npu_utils,
+        "_vendor_npu_info",
+        lambda: {
+            "available": True,
+            "npu_type": "Intel AI Boost",
+            "device_name": "Intel NPU",
+        },
+    )
     info = npu_utils.detect_npu_info()
     assert info["available"] is True
     assert info["npu_type"] == "Intel AI Boost"
@@ -617,10 +684,14 @@ def test_detect_npu_info_apple_silicon(monkeypatch):
     monkeypatch.setattr(npu_utils, "_detect_external_npu", lambda: (False, None))
     monkeypatch.setattr(npu_utils, "_vendor_npu_info", lambda: None)
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(npu_utils, "_detect_apple_neural_engine", lambda: {
-        "available": True,
-        "npu_type": "Apple Neural Engine",
-    })
+    monkeypatch.setattr(
+        npu_utils,
+        "_detect_apple_neural_engine",
+        lambda: {
+            "available": True,
+            "npu_type": "Apple Neural Engine",
+        },
+    )
     info = npu_utils.detect_npu_info()
     assert info["available"] is True
 
@@ -630,10 +701,14 @@ def test_detect_npu_info_directml(monkeypatch):
     monkeypatch.setattr(npu_utils, "_detect_external_npu", lambda: (False, None))
     monkeypatch.setattr(npu_utils, "_vendor_npu_info", lambda: None)
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Windows")
-    monkeypatch.setattr(npu_utils, "_detect_windows_directml_npu", lambda: {
-        "available": True,
-        "npu_type": "DirectML NPU",
-    })
+    monkeypatch.setattr(
+        npu_utils,
+        "_detect_windows_directml_npu",
+        lambda: {
+            "available": True,
+            "npu_type": "DirectML NPU",
+        },
+    )
     info = npu_utils.detect_npu_info()
     assert info["available"] is True
 
@@ -687,7 +762,9 @@ def test_detect_usb_npu_linux_no_lsusb(monkeypatch):
 
 def test_detect_usb_npu_linux_run_failure(monkeypatch):
     """Test _detect_usb_npu_linux when lsusb command fails."""
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x == "lsusb" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x == "lsusb" else None
+    )
 
     class CP:
         returncode = 1
@@ -709,7 +786,9 @@ def test_detect_pcie_npu_linux_no_lspci(monkeypatch):
 
 def test_detect_pcie_npu_linux_run_failure(monkeypatch):
     """Test _detect_pcie_npu_linux when lspci command fails."""
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None
+    )
 
     class CP:
         returncode = 1
@@ -723,7 +802,9 @@ def test_detect_pcie_npu_linux_run_failure(monkeypatch):
 
 def test_detect_pcie_npu_linux_coral(monkeypatch):
     """Test _detect_pcie_npu_linux detects Coral."""
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None
+    )
 
     class CP:
         returncode = 0
@@ -800,6 +881,7 @@ def test_detect_amd_npu_windows_non_windows(monkeypatch):
 
 def test_detect_amd_npu_sdk_error(monkeypatch):
     """Test _detect_amd_npu_sdk handles ImportError."""
+
     def raise_import(*args):
         raise ImportError("test")
 
@@ -823,6 +905,7 @@ def test_detect_amd_npu_os_error(monkeypatch):
 
 def test_detect_apple_neural_engine_os_error(monkeypatch):
     """Test _detect_apple_neural_engine handles OSError."""
+
     def raise_os_error():
         raise OSError("test error")
 
@@ -855,7 +938,9 @@ def test_check_accelerator_availability_import_error():
 
 def test_detect_usb_npu_linux_no_result_stdout(monkeypatch):
     """Test _detect_usb_npu_linux when result has no stdout."""
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x == "lsusb" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x == "lsusb" else None
+    )
 
     class CP:
         returncode = 0
@@ -869,7 +954,9 @@ def test_detect_usb_npu_linux_no_result_stdout(monkeypatch):
 
 def test_detect_pcie_npu_linux_no_result_stdout(monkeypatch):
     """Test _detect_pcie_npu_linux when result has empty stdout."""
-    monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None)
+    monkeypatch.setattr(
+        npu_utils.shutil, "which", lambda x: "/usr/bin/lspci" if x == "lspci" else None
+    )
 
     class CP:
         returncode = 0
@@ -879,4 +966,3 @@ def test_detect_pcie_npu_linux_no_result_stdout(monkeypatch):
     is_ext, name = npu_utils._detect_pcie_npu_linux()
     assert is_ext is False
     assert name is None
-

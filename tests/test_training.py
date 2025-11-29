@@ -186,9 +186,9 @@ class TestOptimizer:
         model = create_multi_modal_model(model_config)
         model_config["training"]["optimizer"] = "sgd"
         model_config["training"]["momentum"] = 0.9
-        
+
         optimizer = create_optimizer(model, model_config)
-        
+
         assert optimizer is not None
         assert "SGD" in type(optimizer).__name__
 
@@ -198,12 +198,12 @@ class TestOptimizer:
 
         model = create_multi_modal_model(model_config)
         optimizer = create_optimizer(model, model_config)
-        
+
         model_config["training"]["scheduler"] = "plateau"
         scheduler, update_freq = create_scheduler(
             optimizer, model_config, steps_per_epoch=100
         )
-        
+
         assert scheduler is not None
         assert update_freq == "epoch"
 
@@ -213,12 +213,12 @@ class TestOptimizer:
 
         model = create_multi_modal_model(model_config)
         optimizer = create_optimizer(model, model_config)
-        
+
         model_config["training"]["scheduler"] = "constant"
         scheduler, update_freq = create_scheduler(
             optimizer, model_config, steps_per_epoch=100
         )
-        
+
         assert scheduler is not None
         assert update_freq == "step"
 
@@ -228,7 +228,7 @@ class TestOptimizer:
 
         model = create_multi_modal_model(model_config)
         model_config["training"]["optimizer"] = "invalid_optimizer"
-        
+
         with pytest.raises((ValueError, KeyError)):
             create_optimizer(model, model_config)
 
@@ -239,7 +239,7 @@ class TestAdaptiveLRController:
     def test_adaptive_lr_controller_init(self):
         """Test AdaptiveLRController initialization."""
         controller = AdaptiveLRController(base_lr=0.001, min_scale=0.1, max_scale=2.0)
-        
+
         assert controller.base_lr == 0.001
         assert controller.min_scale == 0.1
         assert controller.max_scale == 2.0
@@ -252,7 +252,7 @@ class TestAdaptiveLRController:
 
         # Update with scale factor of 0.5 (middle of range)
         controller.update_lr(optimizer, torch.tensor(0.5))
-        
+
         # Expected: 0.1 + 0.5 * (2.0 - 0.1) = 1.05
         # new_lr = 0.1 * 1.05 = 0.105
         expected_scale = 0.1 + 0.5 * (2.0 - 0.1)
@@ -264,7 +264,7 @@ class TestAdaptiveLRController:
         params = torch.randn(10, requires_grad=True)
         optimizer = torch.optim.SGD([params], lr=0.05)
         controller = AdaptiveLRController()
-        
+
         current_lr = controller.get_current_lr(optimizer)
         assert current_lr == 0.05
 
@@ -273,11 +273,11 @@ class TestAdaptiveLRController:
         params = torch.randn(10, requires_grad=True)
         optimizer = torch.optim.SGD([params], lr=0.1)
         controller = AdaptiveLRController(base_lr=0.1, min_scale=0.5, max_scale=1.5)
-        
+
         # Test min scale (lr_scale=0)
         controller.update_lr(optimizer, torch.tensor(0.0))
         assert abs(optimizer.param_groups[0]["lr"] - 0.1 * 0.5) < 1e-6
-        
+
         # Test max scale (lr_scale=1)
         controller.update_lr(optimizer, torch.tensor(1.0))
         assert abs(optimizer.param_groups[0]["lr"] - 0.1 * 1.5) < 1e-6

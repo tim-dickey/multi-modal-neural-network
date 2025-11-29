@@ -131,6 +131,7 @@ class TestAPIIntegration:
     def test_api_response_timestamp(self):
         """Test APIResponse auto-timestamp."""
         import time
+
         before = time.time()
         response = APIResponse(success=True, data="test")
         after = time.time()
@@ -139,10 +140,10 @@ class TestAPIIntegration:
     def test_make_request_with_retry_success(self):
         """Test retry logic with successful request."""
         integration = MockAPIIntegration()
-        
+
         def successful_request():
             return APIResponse(success=True, data="result")
-        
+
         result = integration._make_request_with_retry(successful_request)
         assert result.success is True
         assert result.data == "result"
@@ -150,12 +151,13 @@ class TestAPIIntegration:
     def test_make_request_with_retry_failure(self):
         """Test retry logic with all failures."""
         integration = MockAPIIntegration("key", {"max_retries": 2, "retry_delay": 0.01})
-        
+
         call_count = [0]
+
         def failing_request():
             call_count[0] += 1
             raise Exception("Network error")
-        
+
         result = integration._make_request_with_retry(failing_request)
         assert result.success is False
         assert "failed after" in result.error.lower()
@@ -286,7 +288,9 @@ class TestWolframAlphaIntegration:
                 {
                     "title": "Input",
                     "id": "input",
-                    "subpods": [{"title": "", "plaintext": "original input", "img": None}],
+                    "subpods": [
+                        {"title": "", "plaintext": "original input", "img": None}
+                    ],
                 }
             ],
         )
@@ -384,7 +388,9 @@ class TestWolframAlphaIntegration:
         mock_client_class.return_value = Mock()
         integration = WolframAlphaIntegration("test_key", {})
 
-        response = APIResponse(success=True, data=[{"title": "Test", "subpods": "not a list"}])
+        response = APIResponse(
+            success=True, data=[{"title": "Test", "subpods": "not a list"}]
+        )
         assert integration.validate_response(response) is False
 
     @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
@@ -414,7 +420,7 @@ class TestWolframAlphaIntegration:
             data=[
                 {"title": "Valid", "subpods": []},
                 {"subpods": []},  # Missing title
-            ]
+            ],
         )
         assert integration.validate_response(response) is False
 
@@ -466,18 +472,18 @@ class TestValidators:
     def test_wolfram_validator_invalid_subpods(self):
         """Test Wolfram validator with invalid subpods."""
         validator = WolframResponseValidator()
-        
+
         # subpods not a list
         response = APIResponse(
             success=True,
-            data=[{"title": "Result", "id": "result", "subpods": "not_a_list"}]
+            data=[{"title": "Result", "id": "result", "subpods": "not_a_list"}],
         )
         assert validator.validate(response) is False
-        
+
         # subpod not a dict
         response = APIResponse(
             success=True,
-            data=[{"title": "Result", "id": "result", "subpods": ["string"]}]
+            data=[{"title": "Result", "id": "result", "subpods": ["string"]}],
         )
         assert validator.validate(response) is False
 
@@ -508,7 +514,7 @@ class TestValidators:
     def test_content_validator_quality_score(self):
         """Test content quality score calculation."""
         validator = ContentValidator({"min_confidence": 0.3})
-        
+
         # Content with letters, numbers, special chars, and structure
         good_content = "Hello World! 123\nAnother line."
         result = validator.validate_content(good_content)
@@ -516,7 +522,7 @@ class TestValidators:
         assert result.confidence >= 0.5
         assert result["has_numbers"] is True
         assert result["has_text"] is True
-        
+
         # Very short content
         short_content = "ab"
         result = validator.validate_content(short_content)
@@ -526,14 +532,14 @@ class TestValidators:
         """Test ValidationResult attribute access."""
         validator = ContentValidator({})
         result = validator.validate_content("test content")
-        
+
         # Test dict-like access
         assert result["valid"] is not None
-        
+
         # Test attribute access
         assert result.valid is not None
         assert result.confidence is not None
-        
+
         # Test attribute error for missing key
         with pytest.raises(AttributeError):
             _ = result.nonexistent_key
@@ -552,16 +558,16 @@ class TestValidators:
     def test_knowledge_injection_validator(self):
         """Test KnowledgeInjectionValidator."""
         validator = KnowledgeInjectionValidator({})
-        
+
         # Valid injection data
         valid_data = {"injected": True, "injection_type": "additive"}
         result = validator.validate_injection(valid_data)
         assert result["valid"] is True
-        
+
         # Not a dict
         result = validator.validate_injection("not_a_dict")
         assert result["valid"] is False
-        
+
         # Missing required fields
         result = validator.validate_injection({"injected": True})
         assert result["valid"] is False
@@ -569,7 +575,7 @@ class TestValidators:
     def test_knowledge_injection_validator_with_validations(self):
         """Test KnowledgeInjectionValidator with validations field."""
         validator = KnowledgeInjectionValidator({"min_confidence": 0.5})
-        
+
         # Valid with validations
         data = {
             "injected": True,
@@ -577,7 +583,7 @@ class TestValidators:
             "weight": 0.5,
             "validations": [
                 {"expression": "2+2", "wolfram_result": "4 is a valid result."}
-            ]
+            ],
         }
         result = validator.validate_injection(data)
         assert result["valid"] is True
@@ -586,13 +592,11 @@ class TestValidators:
     def test_knowledge_injection_validator_invalid_content(self):
         """Test KnowledgeInjectionValidator with invalid validation content."""
         validator = KnowledgeInjectionValidator({"max_length": 5})
-        
+
         data = {
             "injected": True,
             "injection_type": "additive",
-            "validations": [
-                {"expression": "x", "wolfram_result": "this is too long"}
-            ]
+            "validations": [{"expression": "x", "wolfram_result": "this is too long"}],
         }
         result = validator.validate_injection(data)
         assert result["valid"] is False
@@ -618,7 +622,7 @@ class TestKnowledgeInjection:
         """Test additive injection with non-tensor knowledge."""
         strategy = AdditiveInjection(weight=0.5)
         model_output = torch.randn(2, 10, 256)
-        
+
         # Non-tensor knowledge should return model_output unchanged
         result = strategy.inject(model_output, "not_a_tensor")
         assert torch.allclose(result, model_output)
@@ -640,7 +644,7 @@ class TestKnowledgeInjection:
         strategy = MultiplicativeInjection(weight=0.5)
         model_output = torch.ones(2, 10)
         knowledge = torch.ones(2, 10) * 2.0
-        
+
         result = strategy.inject(model_output, knowledge)
         expected = model_output * (1 + 0.5 * knowledge)
         assert torch.allclose(result, expected)
@@ -649,7 +653,7 @@ class TestKnowledgeInjection:
         """Test multiplicative injection with non-numeric knowledge."""
         strategy = MultiplicativeInjection(weight=0.1)
         model_output = torch.randn(2, 10)
-        
+
         result = strategy.inject(model_output, "not_numeric")
         assert torch.allclose(result, model_output)
 
@@ -669,7 +673,7 @@ class TestKnowledgeInjection:
         """Test attention injection with non-tensor knowledge."""
         strategy = AttentionInjection(hidden_dim=256, weight=0.5)
         model_output = torch.randn(2, 10, 256)
-        
+
         result = strategy.inject(model_output, "not_a_tensor")
         assert torch.allclose(result, model_output)
 
@@ -722,7 +726,7 @@ class TestKnowledgeInjection:
     def test_injection_manager_no_injectors(self):
         """Test injection manager with no registered injectors."""
         manager = KnowledgeInjectionManager({})
-        
+
         result = manager.inject_knowledge({}, torch.randn(1, 256))
         assert result["success"] is False
         assert "No knowledge injectors" in result["error"]
@@ -730,11 +734,14 @@ class TestKnowledgeInjection:
     def test_injection_manager_injection_not_triggered(self):
         """Test injection manager when injection is not triggered."""
         manager = KnowledgeInjectionManager({})
-        
+
         mock_injector = Mock()
-        mock_injector.inject_knowledge.return_value = {"injected": False, "reason": "low confidence"}
+        mock_injector.inject_knowledge.return_value = {
+            "injected": False,
+            "reason": "low confidence",
+        }
         manager.register_injector("mock", mock_injector)
-        
+
         result = manager.inject_knowledge({}, torch.randn(1, 256), "mock")
         assert result["success"] is False
         assert "low confidence" in result["reason"]
@@ -742,15 +749,15 @@ class TestKnowledgeInjection:
     def test_injection_manager_strategy_exception(self):
         """Test injection manager handles strategy exceptions."""
         manager = KnowledgeInjectionManager({})
-        
+
         mock_injector = Mock()
         mock_injector.inject_knowledge.return_value = {"injected": True}
         manager.register_injector("mock", mock_injector)
-        
+
         failing_strategy = Mock()
         failing_strategy.inject.side_effect = RuntimeError("Strategy failed")
         manager.register_strategy("failing", failing_strategy)
-        
+
         result = manager.inject_knowledge({}, torch.randn(1, 256), "mock", "failing")
         assert result["success"] is False
         assert "failed" in result["error"].lower()
@@ -761,19 +768,19 @@ class TestKnowledgeInjection:
         manager.register_injector("inj1", Mock())
         manager.register_injector("inj2", Mock())
         manager.register_strategy("strat1", Mock())
-        
+
         assert manager.get_available_injectors() == ["inj1", "inj2"]
         assert manager.get_available_strategies() == ["strat1"]
 
     def test_injection_manager_uses_first_injector(self):
         """Test manager uses first injector when none specified."""
         manager = KnowledgeInjectionManager({})
-        
+
         mock_injector = Mock()
         mock_injector.inject_knowledge.return_value = {"injected": True}
         mock_injector.__class__.__name__ = "MockInjector"
         manager.register_injector("first", mock_injector)
-        
+
         result = manager.inject_knowledge({}, torch.randn(1, 256))
         assert result["success"] is True
         mock_injector.inject_knowledge.assert_called_once()
@@ -805,7 +812,7 @@ class TestKnowledgeInjectorBase:
     def test_knowledge_injector_inject_knowledge_not_implemented(self):
         """Test inject_knowledge raises NotImplementedError."""
         injector = KnowledgeInjector(Mock(), {})
-        
+
         with pytest.raises(NotImplementedError):
             injector.inject_knowledge("input", torch.randn(1, 256))
 
@@ -813,9 +820,9 @@ class TestKnowledgeInjectorBase:
         """Test injector stores api and config."""
         mock_api = Mock()
         config = {"key": "value", "validation_threshold": 0.3}
-        
+
         injector = KnowledgeInjector(mock_api, config)
-        
+
         assert injector.api is mock_api
         assert injector.config == config
         assert injector.validation_threshold == 0.3
@@ -839,7 +846,7 @@ class TestAPIResponseDataclass:
             success=False,
             data=None,
             error="Connection failed",
-            metadata={"status": 500}
+            metadata={"status": 500},
         )
         assert response.success is False
         assert response.data is None
@@ -849,10 +856,11 @@ class TestAPIResponseDataclass:
     def test_api_response_timestamp_auto_fill(self):
         """Test APIResponse timestamp is auto-filled."""
         import time
+
         before = time.time()
         response = APIResponse(success=True, data="test")
         after = time.time()
-        
+
         assert before <= response.timestamp <= after
 
 

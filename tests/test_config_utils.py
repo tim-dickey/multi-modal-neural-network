@@ -27,9 +27,11 @@ def test_resolve_env_vars_and_save_tmp(tmp_path, monkeypatch):
 
 
 def test_merge_and_validate_and_namespace(tmp_path):
-    base = {"model": {"vision_encoder": {}, "text_encoder": {}, "fusion": {}, "heads": {}},
-            "training": {"max_epochs": 1, "inner_lr": 0.001},
-            "data": {}}
+    base = {
+        "model": {"vision_encoder": {}, "text_encoder": {}, "fusion": {}, "heads": {}},
+        "training": {"max_epochs": 1, "inner_lr": 0.001},
+        "data": {},
+    }
     override = {"training": {"inner_lr": 0.01}, "extra": 1}
     merged = merge_configs(base, override)
     assert merged["training"]["inner_lr"] == 0.01

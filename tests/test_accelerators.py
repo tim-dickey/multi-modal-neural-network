@@ -36,6 +36,8 @@ def test_npu_external_info_and_best_device(monkeypatch):
     # get_best_available_device returns a device string (cpu/mps/openvino/cuda/etc.)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     # Simulate no mps
-    monkeypatch.setattr(torch.backends, "mps", types.SimpleNamespace(is_available=lambda: False))
+    monkeypatch.setattr(
+        torch.backends, "mps", types.SimpleNamespace(is_available=lambda: False)
+    )
     dev = npu_utils.get_best_available_device()
     assert isinstance(dev, str)

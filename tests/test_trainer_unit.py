@@ -51,7 +51,6 @@ from src.training.training_state import (
     TrainingState,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -63,7 +62,9 @@ class DummyMetricsLogger:
     def __init__(self, log_dir: str, experiment_name: str) -> None:
         self.log_dir = log_dir
         self.experiment_name = experiment_name
-        self.logged_epochs: list[tuple[int, Dict[str, float], Dict[str, float] | None]] = []
+        self.logged_epochs: list[
+            tuple[int, Dict[str, float], Dict[str, float] | None]
+        ] = []
 
     def log_epoch(
         self,
@@ -383,19 +384,17 @@ class TestDeviceManager:
 
         # Mock GPU detection
         monkeypatch.setattr(
-            npu_utils,
-            "get_best_available_device",
-            lambda prefer_npu=False: "cuda"
+            npu_utils, "get_best_available_device", lambda prefer_npu=False: "cuda"
         )
         monkeypatch.setattr(
             gpu_utils,
             "detect_gpu_info",
-            lambda: {"available": True, "devices": [{"name": "NVIDIA GTX 1080"}]}
+            lambda: {"available": True, "devices": [{"name": "NVIDIA GTX 1080"}]},
         )
         monkeypatch.setattr(
             gpu_utils,
             "configure_device_for_training",
-            lambda device, gpu_id=None, verbose=False: torch.device("cpu")
+            lambda device, gpu_id=None, verbose=False: torch.device("cpu"),
         )
 
         config = {"hardware": {"device": "auto"}}
@@ -409,14 +408,12 @@ class TestDeviceManager:
 
         # Mock NPU detection
         monkeypatch.setattr(
-            npu_utils,
-            "get_best_available_device",
-            lambda prefer_npu=False: "openvino"
+            npu_utils, "get_best_available_device", lambda prefer_npu=False: "openvino"
         )
         monkeypatch.setattr(
             npu_utils,
             "detect_npu_info",
-            lambda: {"available": True, "device_name": "Intel AI Boost NPU"}
+            lambda: {"available": True, "device_name": "Intel AI Boost NPU"},
         )
 
         config = {"hardware": {"device": "auto"}}
@@ -430,14 +427,12 @@ class TestDeviceManager:
 
         # Mock no GPU/NPU available
         monkeypatch.setattr(
-            npu_utils,
-            "get_best_available_device",
-            lambda prefer_npu=False: "cpu"
+            npu_utils, "get_best_available_device", lambda prefer_npu=False: "cpu"
         )
         monkeypatch.setattr(
             gpu_utils,
             "configure_device_for_training",
-            lambda device, gpu_id=None, verbose=False: torch.device("cpu")
+            lambda device, gpu_id=None, verbose=False: torch.device("cpu"),
         )
 
         config = {"hardware": {"device": "auto"}}
@@ -453,7 +448,9 @@ class TestDeviceManager:
         config = {"hardware": {"device": "cpu"}}
         dm = DeviceManager(config)
         # Simulate CUDA device
-        dm._device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        dm._device = (
+            torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        )
 
         if dm.is_cuda:
             scaler = dm.create_grad_scaler()
@@ -473,14 +470,16 @@ class TestDeviceManager:
         monkeypatch.setattr(
             gpu_utils_module,
             "detect_gpu_info",
-            lambda: {"available": True, "devices": [{"name": "NVIDIA RTX 3080"}]}
+            lambda: {"available": True, "devices": [{"name": "NVIDIA RTX 3080"}]},
         )
 
         # Directly call _log_detected_device with "cuda"
         with caplog.at_level(logging.INFO):
             dm._log_detected_device("cuda")
 
-        assert any("CUDA GPU" in r.message and "RTX 3080" in r.message for r in caplog.records)
+        assert any(
+            "CUDA GPU" in r.message and "RTX 3080" in r.message for r in caplog.records
+        )
 
 
 # =============================================================================
@@ -924,9 +923,7 @@ class TestAdaptiveLRController:
 
     def test_custom_initialization(self):
         """Test custom initialization."""
-        controller = AdaptiveLRController(
-            base_lr=1e-3, min_scale=0.5, max_scale=1.5
-        )
+        controller = AdaptiveLRController(base_lr=1e-3, min_scale=0.5, max_scale=1.5)
         assert controller.base_lr == 1e-3
         assert controller.min_scale == 0.5
         assert controller.max_scale == 1.5
@@ -958,9 +955,7 @@ class TestTrainingComponentsFactory:
         """Test criterion creation."""
         model = SimpleModel()
         config = {"training": {"loss_type": "cross_entropy"}}
-        factory = TrainingComponentsFactory(
-            model=model, config=config, train_loader=[]
-        )
+        factory = TrainingComponentsFactory(model=model, config=config, train_loader=[])
         criterion = factory.create_criterion()
         assert isinstance(criterion, CrossEntropyLoss)
 
@@ -982,9 +977,7 @@ class TestTrainingComponentsFactory:
         """Test optimizer creation via factory."""
         model = SimpleModel()
         config = {"training": {"optimizer": "adamw"}}
-        factory = TrainingComponentsFactory(
-            model=model, config=config, train_loader=[]
-        )
+        factory = TrainingComponentsFactory(model=model, config=config, train_loader=[])
         optimizer = factory.create_optimizer()
         assert isinstance(optimizer, torch.optim.AdamW)
 
@@ -1003,9 +996,7 @@ class TestTrainingComponentsFactory:
         """Test gradient clipper creation."""
         model = SimpleModel()
         config = {"training": {"max_grad_norm": 0.5}}
-        factory = TrainingComponentsFactory(
-            model=model, config=config, train_loader=[]
-        )
+        factory = TrainingComponentsFactory(model=model, config=config, train_loader=[])
         clipper = factory.create_gradient_clipper()
         assert clipper.max_norm == 0.5
 
@@ -1168,7 +1159,10 @@ class TestTrainerIntegration:
         t = make_simple_trainer(tmp_path)
 
         # Setup data
-        batch = {"images": torch.randn(4, 1, 2, 2), "labels": torch.tensor([0, 1, 2, 0])}
+        batch = {
+            "images": torch.randn(4, 1, 2, 2),
+            "labels": torch.tensor([0, 1, 2, 0]),
+        }
         t.train_loader = [batch, batch]  # 2 batches
         t.val_loader = [batch]
 
@@ -1208,4 +1202,3 @@ class TestTrainerIntegration:
         assert t2.current_epoch == 6  # epoch + 1
         assert t2.global_step == 100
         assert t2.best_val_loss == 0.25
-
