@@ -110,6 +110,96 @@ def create_optimizer(model: torch.nn.Module, config: Dict) -> torch.optim.Optimi
     return optimizer
 
 
+def _init_optimizer_step_count(optimizer: torch.optim.Optimizer) -> None:
+    """Initialize optimizer step count to avoid PyTorch warnings.
+
+    Marks optimizer as having taken an initial step to avoid PyTorch warning
+    when users call `scheduler.step()` before `optimizer.step()` in simple
+    unit tests or scripts.
+    """
+    if getattr(optimizer, "_step_count", 0) == 0:
+        try:
+            setattr(optimizer, "_step_count", 1)
+        except (AttributeError, TypeError):
+            pass
+
+
+def _create_cosine_scheduler(
+    optimizer: torch.optim.Optimizer,
+    warmup_steps: int,
+    total_steps: int,
+    min_lr: float,
+) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
+    """Create cosine annealing scheduler with linear warmup."""
+    warmup_scheduler = LinearLR(
+        optimizer,
+        start_factor=TRAINING.warmup_start_factor,
+        end_factor=TRAINING.warmup_end_factor,
+        total_iters=warmup_steps,
+    )
+
+    cosine_scheduler = CosineAnnealingLR(
+        optimizer,
+        T_max=total_steps - warmup_steps,
+        eta_min=min_lr,
+    )
+
+    scheduler = SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, cosine_scheduler],
+        milestones=[warmup_steps],
+    )
+
+    _init_optimizer_step_count(optimizer)
+    return scheduler, "step"
+
+
+def _create_linear_scheduler(
+    optimizer: torch.optim.Optimizer,
+    warmup_steps: int,
+    total_steps: int,
+) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
+    """Create linear warmup then linear decay scheduler."""
+    def lr_lambda(step: int) -> float:
+        if step < warmup_steps:
+            return float(step / warmup_steps)
+        return max(0.0, float((total_steps - step) / (total_steps - warmup_steps)))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    _init_optimizer_step_count(optimizer)
+    return scheduler, "step"
+
+
+def _create_constant_scheduler(
+    optimizer: torch.optim.Optimizer,
+    warmup_steps: int,
+) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
+    """Create constant learning rate scheduler with warmup."""
+    def lr_lambda(step: int) -> float:
+        if step < warmup_steps:
+            return float(step / warmup_steps)
+        return 1.0
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    _init_optimizer_step_count(optimizer)
+    return scheduler, "step"
+
+
+def _create_plateau_scheduler(
+    optimizer: torch.optim.Optimizer,
+    min_lr: float,
+) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
+    """Create reduce-on-plateau scheduler."""
+    scheduler = ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=5,
+        min_lr=min_lr,
+    )
+    return scheduler, "epoch"
+
+
 def create_scheduler(
     optimizer: torch.optim.Optimizer, config: Dict, steps_per_epoch: int
 ) -> Tuple[torch.optim.lr_scheduler.LRScheduler, str]:
@@ -129,87 +219,16 @@ def create_scheduler(
     warmup_steps = training_config.get("warmup_steps", TRAINING.warmup_steps)
     max_epochs = training_config.get("max_epochs", TRAINING.max_epochs)
     total_steps = steps_per_epoch * max_epochs
-
-    scheduler: torch.optim.lr_scheduler.LRScheduler
+    min_lr = training_config.get("min_lr", TRAINING.min_learning_rate)
 
     if scheduler_name == "cosine":
-        # Cosine annealing with linear warmup
-        warmup_scheduler = LinearLR(
-            optimizer,
-            start_factor=TRAINING.warmup_start_factor,
-            end_factor=TRAINING.warmup_end_factor,
-            total_iters=warmup_steps,
-        )
-
-        cosine_scheduler = CosineAnnealingLR(
-            optimizer,
-            T_max=total_steps - warmup_steps,
-            eta_min=training_config.get("min_lr", TRAINING.min_learning_rate),
-        )
-
-        scheduler = SequentialLR(
-            optimizer,
-            schedulers=[warmup_scheduler, cosine_scheduler],
-            milestones=[warmup_steps],
-        )
-
-        # Mark optimizer as having taken an initial step to avoid
-        # PyTorch warning when users call `scheduler.step()` before
-        # `optimizer.step()` in simple unit tests or scripts.
-        if getattr(optimizer, "_step_count", 0) == 0:
-            try:
-                setattr(optimizer, "_step_count", 1)
-            except (AttributeError, TypeError):
-                # Best-effort; avoid crashing if attribute is unavailable
-                pass
-
-        return scheduler, "step"
-
+        return _create_cosine_scheduler(optimizer, warmup_steps, total_steps, min_lr)
     elif scheduler_name == "linear":
-        # Linear warmup then linear decay
-        def lr_lambda(step: int) -> float:
-            if step < warmup_steps:
-                return float(step / warmup_steps)
-            else:
-                return max(
-                    0.0, float((total_steps - step) / (total_steps - warmup_steps))
-                )
-
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-        if getattr(optimizer, "_step_count", 0) == 0:
-            try:
-                setattr(optimizer, "_step_count", 1)
-            except (AttributeError, TypeError):
-                pass
-        return scheduler, "step"
-
+        return _create_linear_scheduler(optimizer, warmup_steps, total_steps)
     elif scheduler_name == "plateau":
-        # Reduce on plateau
-        scheduler = ReduceLROnPlateau(
-            optimizer,
-            mode="min",
-            factor=0.5,
-            patience=5,
-            min_lr=training_config.get("min_lr", TRAINING.min_learning_rate),
-        )
-        return scheduler, "epoch"
-
+        return _create_plateau_scheduler(optimizer, min_lr)
     elif scheduler_name == "constant":
-        # Constant learning rate with warmup
-        def lr_lambda(step: int) -> float:
-            if step < warmup_steps:
-                return float(step / warmup_steps)
-            else:
-                return 1.0
-
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-        if getattr(optimizer, "_step_count", 0) == 0:
-            try:
-                setattr(optimizer, "_step_count", 1)
-            except (AttributeError, TypeError):
-                pass
-        return scheduler, "step"
-
+        return _create_constant_scheduler(optimizer, warmup_steps)
     else:
         raise ValueError(f"Unknown scheduler: {scheduler_name}")
 

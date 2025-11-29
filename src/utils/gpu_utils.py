@@ -81,19 +81,34 @@ def _detect_external_gpu(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
     return False, None
 
 
-def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
-    """Windows-specific external GPU detection using PowerShell."""
-    # Build the PowerShell command as a parameterized script and pass the
-    # GPU name as an argument to avoid embedding untrusted input directly
-    # into the command string. We also sanitize the value to remove any
-    # control or metacharacters as a defence-in-depth measure.
-    safe_fragment = ""
+def _sanitize_gpu_name(gpu_name: str) -> str:
+    """Sanitize GPU name for safe use in PowerShell commands."""
     try:
         first_token = gpu_name.split()[0] if gpu_name else ""
         # Allow alphanumerics, space, underscore and hyphen only; limit length
-        safe_fragment = re.sub(r"[^A-Za-z0-9 _-]", "", first_token)[:64]
+        return re.sub(r"[^A-Za-z0-9 _-]", "", first_token)[:64]
     except Exception:
-        safe_fragment = ""
+        return ""
+
+
+def _parse_connection_type(output: str) -> tuple[bool, str | None]:
+    """Parse PowerShell output to determine external GPU connection type."""
+    output_lower = output.lower()
+    if "thunderbolt" in output_lower or "usb4" in output_lower:
+        return True, "Thunderbolt"
+    if "usb" in output_lower and "type-c" in output_lower:
+        return True, "USB-C"
+    if "external" in output_lower:
+        return True, "PCIe External"
+    return False, None
+
+
+def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str | None]:
+    """Windows-specific external GPU detection using PowerShell."""
+    if not shutil.which("powershell"):
+        return False, None
+
+    safe_fragment = _sanitize_gpu_name(gpu_name)
 
     # PowerShell script accepts a parameter ($name) and uses it in a -like
     # comparison. Passing via -ArgumentList avoids shell interpolation risks.
@@ -104,10 +119,6 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str 
         " Write-Output \"$($parentDevice.FriendlyName)|$busType\"; }"
     )
 
-    # Only run PowerShell if available
-    if not shutil.which("powershell"):
-        return False, None
-
     result = _safe_subprocess_run([
         "powershell",
         "-Command",
@@ -117,13 +128,7 @@ def _detect_external_gpu_windows(gpu_id: int, gpu_name: str) -> tuple[bool, str 
     ], timeout=5)
 
     if result and result.returncode == 0 and result.stdout and result.stdout.strip():
-        output = result.stdout.strip().lower()
-        if "thunderbolt" in output or "usb4" in output:
-            return True, "Thunderbolt"
-        if "usb" in output and "type-c" in output:
-            return True, "USB-C"
-        if "external" in output:
-            return True, "PCIe External"
+        return _parse_connection_type(result.stdout.strip())
 
     return False, None
 
