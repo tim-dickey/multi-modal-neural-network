@@ -1084,26 +1084,26 @@ model, config = load_model("configs/default.yaml", "checkpoints/best.safetensors
 **Successful Training Start:**
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                     MULTI-MODAL NEURAL NETWORK TRAINING                       ║
+║                     MULTI-MODAL NEURAL NETWORK TRAINING                      ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  Configuration: configs/default.yaml                                          ║
+║  Configuration: configs/default.yaml                                         ║
 ║  Device: cuda:0 (NVIDIA GeForce RTX 4070)                                    ║
-║  Mixed Precision: bf16                                                        ║
-║  Parameters: 125.5M                                                           ║
+║  Mixed Precision: bf16                                                       ║
+║  Parameters: 125.5M                                                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  Starting training...                                                         ║
+║  Starting training...                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
 **GPU Information Display:**
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                           GPU INFORMATION                                     ║
+║                           GPU INFORMATION                                    ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  ┌─────────────────────────────────────────────────────────────────────────┐ ║
 ║  │ Device 0: NVIDIA GeForce RTX 4070                                       │ ║
-║  │   Memory: 12.00 GB total | 0.00 GB used | 12.00 GB free                │ ║
-║  │   Compute: SM 8.9 | CUDA 12.1 | cuDNN 8.9                              │ ║
+║  │   Memory: 12.00 GB total | 0.00 GB used | 12.00 GB free                 │ ║
+║  │   Compute: SM 8.9 | CUDA 12.1 | cuDNN 8.9                               │ ║
 ║  │   Features: ✓ FP16 | ✓ BF16 | ✓ TF32 | ✓ Tensor Cores                  │ ║
 ║  └─────────────────────────────────────────────────────────────────────────┘ ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
