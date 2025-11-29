@@ -426,10 +426,9 @@ class Trainer:
             total_correct += int((preds == batch["labels"]).sum().item())
             total_samples += int(batch["labels"].size(0))
 
-            if (
-                batch_idx % int(self.config.get("training", {}).get("log_interval", 10))
-                == 0
-            ):
+            # Ensure a sane log interval (avoid zero or non-int config values)
+            log_interval = max(1, int(self.config.get("training", {}).get("log_interval", 10)))
+            if (batch_idx % log_interval) == 0:
                 # Use logger formatting to keep line lengths short
                 self.logger.info(
                     "Epoch %d [%d/%d] Loss: %.4f",

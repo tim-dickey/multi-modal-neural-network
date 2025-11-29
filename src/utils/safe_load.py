@@ -8,6 +8,7 @@ and encourages using `safetensors` when available.
 from typing import Optional, Set, Dict, Any
 from pathlib import Path
 import tempfile
+import os
 
 import torch
 
@@ -53,6 +54,7 @@ def safe_load_checkpoint(
         repo_root = Path(__file__).resolve().parents[2]
     except Exception:
         repo_root = Path.cwd()
+
     trusted_roots = {repo_root.resolve(), Path(tempfile.gettempdir()).resolve()}
 
     try:
@@ -60,7 +62,23 @@ def safe_load_checkpoint(
     except Exception:
         resolved = p
 
-    if not allow_external and not any(str(resolved).startswith(str(tr)) for tr in trusted_roots):
+    def _is_in_trusted(resolved_path: Path) -> bool:
+        try:
+            # Preferred (Python 3.9+): use is_relative_to for robust checks
+            for tr in trusted_roots:
+                if resolved_path.is_relative_to(tr):
+                    return True
+            return False
+        except Exception:
+            # Fallback: compare commonpath
+            try:
+                rp = str(resolved_path.resolve())
+                roots = [str(tr.resolve()) for tr in trusted_roots]
+                return any(os.path.commonpath([rp, r]) == r for r in roots)
+            except Exception:
+                return False
+
+    if not allow_external and not _is_in_trusted(resolved):
         raise ValueError(
             "Loading checkpoints from external/untrusted paths is disabled by default; "
             "set allow_external=True to override when necessary."
@@ -71,7 +89,21 @@ def safe_load_checkpoint(
         try:
             from safetensors.torch import load_file as _st_load
 
-            data = _st_load(path, device=map_location if map_location is not None else "cpu")
+            # Normalize map_location for safetensors loader: pass a device string
+            if map_location is None:
+                st_device = "cpu"
+            else:
+                try:
+                    # Accept strings like 'cpu' or 'cuda:0' or torch.device
+                    st_device = (
+                        map_location
+                        if isinstance(map_location, str)
+                        else str(map_location)
+                    )
+                except Exception:
+                    st_device = "cpu"
+
+            data = _st_load(path, device=st_device)
             # safetensors loaders return a mapping of tensors; normalize to dict
             if not isinstance(data, dict):
                 raise ValueError("safetensors loader returned unexpected type")

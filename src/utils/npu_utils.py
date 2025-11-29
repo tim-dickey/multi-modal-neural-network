@@ -26,7 +26,9 @@ def _run_powershell_pnp_probe(cmd_body: str, args: list[str] | None = None) -> O
     """
     # Avoid running PowerShell if it's not present on the system.
     if not shutil.which("powershell"):
-        raise OSError("PowerShell is not available on this system")
+        # PowerShell not available: return None so callers can treat this
+        # as a non-fatal absence of the probe rather than an exception.
+        return None
 
     # Build a static command list and pass arguments via -ArgumentList to
     # avoid shell interpolation. Use -NoProfile and -NonInteractive for
