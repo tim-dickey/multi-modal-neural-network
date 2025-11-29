@@ -170,6 +170,7 @@ weights/
 # Cache directories
 .cache/
 .wandb/
+wandb/
 .tensorboard/
 .lightning/
 

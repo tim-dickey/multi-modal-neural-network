@@ -3,7 +3,7 @@ name: PyTorch Upgrade Smoke
 on:
   pull_request:
     branches:
-      - fix/upgrade-pytorch-2.6
+      - fix/upgrade-pytorch-2.8
 
 jobs:
   smoke-test:
@@ -13,10 +13,10 @@ jobs:
         python: [3.10, 3.11]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
 
@@ -26,7 +26,7 @@ jobs:
       - name: Install candidate PyTorch
         run: |
           # Candidate pin from upgrade branch
-          pip install --no-cache-dir torch==2.6.2 torchvision==0.16.2
+          pip install --no-cache-dir torch>=2.8.0 torchvision>=0.23.0
 
       - name: Install project (dev) dependencies
         run: |
@@ -39,7 +39,7 @@ jobs:
 
       - name: Upload test logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pytorch-smoke-logs
           path: |
@@ -53,10 +53,10 @@ jobs:
     if: always()
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -68,7 +68,7 @@ jobs:
       - name: Download Torch wheels (no install)
         run: |
           mkdir -p /tmp/wheels
-          python -m pip download "torch==2.6.2" "torchvision==0.16.2" --no-deps -d /tmp/wheels || true
+          python -m pip download "torch>=2.8.0" "torchvision>=0.23.0" --no-deps -d /tmp/wheels || true
           ls -lah /tmp/wheels || true
 
       - name: Inspect wheel contents for native libs

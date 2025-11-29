@@ -2,8 +2,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-red.svg)](https://pytorch.org/)
-[![Tests](https://img.shields.io/badge/tests-446%20passing-brightgreen.svg)](tests/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.8+-red.svg)](https://pytorch.org/)
+[![Tests](https://img.shields.io/badge/tests-483%20passing-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](htmlcov/index.html)
 
 This repository contains an open-source implementation of a multi-modal small neural network that incorporates double-loop learning mechanisms and integrates with external APIs for computational knowledge enhancement. The system is designed to train on consumer-grade hardware while maintaining acceptable performance and accuracy.
