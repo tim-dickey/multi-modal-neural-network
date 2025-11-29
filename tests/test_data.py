@@ -8,6 +8,7 @@ from src.data.dataset import (
     ImageNetDataset,
     MultiModalDataset,
     create_data_loaders,
+    create_dataset_from_config,
     get_transforms,
 )
 
@@ -518,3 +519,158 @@ class TestDataPipelinePerformance:
 
         # Should be reasonably fast (< 5 seconds for 20 images)
         assert elapsed < 5.0
+
+
+class TestCreateDatasetFromConfig:
+    """Tests for create_dataset_from_config function."""
+
+    def test_create_dataset_from_config_unknown(self):
+        """Test error on unknown dataset."""
+        config = {"data": {"train_dataset": "unknown_dataset"}}
+        
+        with pytest.raises(ValueError, match="Unknown dataset"):
+            create_dataset_from_config(config)
+
+    def test_create_dataset_from_config_imagenet(self, temp_data_dir):
+        """Test creating ImageNet dataset from config."""
+        import numpy as np
+        from PIL import Image
+
+        # Create ImageNet structure
+        for split in ["train", "val"]:
+            split_dir = temp_data_dir / split
+            split_dir.mkdir()
+            
+            for class_id in range(2):
+                class_dir = split_dir / f"n{class_id:08d}"
+                class_dir.mkdir()
+                
+                img = Image.fromarray(
+                    np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
+                )
+                img_path = class_dir / f"{class_id}_0.JPEG"
+                img.save(img_path)
+
+        config = {
+            "data": {
+                "train_dataset": "imagenet",
+                "data_path": str(temp_data_dir),
+            },
+            "model": {
+                "vision_encoder": {
+                    "img_size": 64,
+                }
+            }
+        }
+        
+        train_ds, val_ds = create_dataset_from_config(config)
+        
+        assert len(train_ds) > 0
+        assert len(val_ds) > 0
+
+    def test_create_dataset_from_config_coco(self, temp_data_dir):
+        """Test creating COCO dataset from config."""
+        import json
+        import numpy as np
+        from PIL import Image
+
+        # Create COCO structure
+        for split in ["train", "val"]:
+            images_dir = temp_data_dir / f"{split}2017"
+            images_dir.mkdir()
+            
+            annotations = {"images": [], "annotations": []}
+            
+            for i in range(2):
+                img = Image.fromarray(
+                    np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
+                )
+                img_path = images_dir / f"{i:012d}.jpg"
+                img.save(img_path)
+                
+                annotations["images"].append({
+                    "id": i,
+                    "file_name": f"{i:012d}.jpg",
+                })
+                annotations["annotations"].append({
+                    "id": i,
+                    "image_id": i,
+                    "caption": f"Test caption {i}",
+                })
+            
+            annotations_dir = temp_data_dir / "annotations"
+            annotations_dir.mkdir(exist_ok=True)
+            
+            with open(annotations_dir / f"captions_{split}2017.json", "w") as f:
+                json.dump(annotations, f)
+
+        config = {
+            "data": {
+                "train_dataset": "coco_captions",
+                "data_path": str(temp_data_dir),
+            },
+            "model": {
+                "vision_encoder": {
+                    "img_size": 64,
+                }
+            }
+        }
+        
+        train_ds, val_ds = create_dataset_from_config(config)
+        
+        assert len(train_ds) > 0
+        assert len(val_ds) > 0
+
+
+class TestMultiModalDatasetWithTokenizer:
+    """Tests for MultiModalDataset with tokenizer support."""
+
+    def test_dataset_with_custom_tokenizer(self, temp_data_dir):
+        """Test dataset with custom tokenizer."""
+        import json
+        import numpy as np
+        from PIL import Image
+        from unittest.mock import Mock
+
+        # Create dummy data
+        images_dir = temp_data_dir / "images"
+        images_dir.mkdir()
+        annotations_file = temp_data_dir / "annotations.json"
+
+        annotations = []
+        for i in range(2):
+            img = Image.fromarray(
+                np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
+            )
+            img_path = images_dir / f"image_{i}.jpg"
+            img.save(img_path)
+
+            annotations.append({
+                "image_id": i,
+                "image_path": str(img_path),
+                "caption": f"Test caption {i}",
+                "label": i,
+            })
+
+        with open(annotations_file, "w") as f:
+            json.dump(annotations, f)
+
+        # Mock tokenizer
+        mock_tokenizer = Mock()
+        mock_tokenizer.return_value = {
+            "input_ids": torch.tensor([1, 2, 3, 4, 5]),
+            "attention_mask": torch.tensor([1, 1, 1, 1, 1]),
+        }
+
+        dataset = MultiModalDataset(
+            data_path=str(temp_data_dir),
+            split="train",
+            img_size=64,
+            max_text_length=128,
+            tokenizer=mock_tokenizer,
+        )
+
+        # Access an item (should use the mock tokenizer)
+        item = dataset[0]
+        assert "input_ids" in item
+        assert "attention_mask" in item

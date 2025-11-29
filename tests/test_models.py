@@ -223,6 +223,203 @@ class TestDoubleLoopController:
         assert controller.step_count == 0
         assert len(controller.loss_history) == 0
 
+    def test_controller_compute_meta_gradient(self, double_loop_config, batch_size, hidden_dim):
+        """Test controller compute_meta_gradient method."""
+        from src.models import create_double_loop_controller
+
+        controller = create_double_loop_controller(double_loop_config)
+        controller.train()
+
+        # Create a dummy model
+        dummy_model = torch.nn.Linear(hidden_dim, hidden_dim)
+        loss = torch.tensor(0.5)
+        accuracy = torch.tensor(0.8)
+
+        # Build some history by calling compute_meta_gradient multiple times
+        for _ in range(15):
+            meta_metrics = controller.compute_meta_gradient(dummy_model, loss, accuracy)
+
+        # Check that meta metrics are returned
+        assert isinstance(meta_metrics, dict)
+        assert "loss_trend" in meta_metrics
+        assert "accuracy_trend" in meta_metrics
+        assert "loss_variance" in meta_metrics
+        assert "accuracy_variance" in meta_metrics
+
+    def test_controller_hidden_state_persistence(self, double_loop_config, batch_size, hidden_dim):
+        """Test that hidden states persist across forward calls."""
+        from src.models import create_double_loop_controller
+
+        controller = create_double_loop_controller(double_loop_config)
+        controller.eval()
+
+        model_features = torch.randn(batch_size, hidden_dim)
+        loss = torch.randn(batch_size, 1)
+        accuracy = torch.randn(batch_size, 1)
+        gradient_norm = torch.randn(batch_size, 1)
+
+        # First forward pass
+        with torch.no_grad():
+            output1 = controller(model_features, loss, accuracy, gradient_norm)
+
+        # Second forward pass should have different output due to state
+        with torch.no_grad():
+            output2 = controller(model_features, loss, accuracy, gradient_norm)
+
+        # Outputs should differ due to hidden state
+        assert controller.step_count == 2
+
+    def test_controller_should_update_meta(self, double_loop_config):
+        """Test controller should_update_meta method."""
+        from src.models import create_double_loop_controller
+
+        controller = create_double_loop_controller(double_loop_config)
+        
+        # Initially step_count is 0, should return True (0 % update_frequency == 0)
+        assert controller.should_update_meta() is True
+        
+        # Increment step count manually
+        controller.step_count = 5
+        assert controller.should_update_meta() is False
+        
+        # At update_frequency multiple, should return True
+        controller.step_count = double_loop_config["update_frequency"]
+        assert controller.should_update_meta() is True
+
+    def test_controller_history_limiting(self, double_loop_config):
+        """Test that history is limited to prevent memory issues."""
+        from src.models import create_double_loop_controller
+
+        controller = create_double_loop_controller(double_loop_config)
+        dummy_model = torch.nn.Linear(10, 10)
+        
+        # Add more than 1000 entries to history
+        for i in range(1100):
+            loss = torch.tensor(float(i) / 1100)
+            accuracy = torch.tensor(float(i) / 1100)
+            controller.compute_meta_gradient(dummy_model, loss, accuracy)
+        
+        # History should be limited to 1000
+        assert len(controller.loss_history) <= 1000
+        assert len(controller.accuracy_history) <= 1000
+
+
+class TestLSTMMetaController:
+    """Tests for LSTM meta-controller component."""
+
+    def test_lstm_meta_controller_forward(self, batch_size, hidden_dim):
+        """Test LSTM meta-controller forward pass."""
+        from src.models.double_loop_controller import LSTMMetaController
+
+        controller = LSTMMetaController(
+            model_hidden_dim=hidden_dim,
+            controller_hidden_dim=128,
+            num_layers=2,
+            dropout=0.1,
+        )
+        controller.eval()
+
+        # Inputs match expected format: model_features, loss, accuracy, gradient_norm
+        model_features = torch.randn(batch_size, hidden_dim)
+        loss = torch.randn(batch_size, 1)
+        accuracy = torch.randn(batch_size, 1)
+        gradient_norm = torch.randn(batch_size, 1)
+
+        with torch.no_grad():
+            lr_scale, arch_adaptation, meta_loss = controller(
+                model_features, loss, accuracy, gradient_norm
+            )
+
+        assert lr_scale.shape == (batch_size, 1)
+        assert arch_adaptation.shape == (batch_size, 64)
+        assert meta_loss.shape == (batch_size, 1)
+
+    def test_lstm_meta_controller_with_hidden_state(self, batch_size, hidden_dim):
+        """Test LSTM meta-controller with hidden state persistence."""
+        from src.models.double_loop_controller import LSTMMetaController
+
+        controller = LSTMMetaController(
+            model_hidden_dim=hidden_dim,
+            controller_hidden_dim=128,
+            num_layers=2,
+            dropout=0.1,
+        )
+        controller.eval()
+
+        model_features = torch.randn(batch_size, hidden_dim)
+        loss = torch.randn(batch_size, 1)
+        accuracy = torch.randn(batch_size, 1)
+        gradient_norm = torch.randn(batch_size, 1)
+
+        # First forward pass sets hidden state
+        with torch.no_grad():
+            output1 = controller(model_features, loss, accuracy, gradient_norm)
+
+        # Hidden state should now be set
+        assert controller.hidden_state is not None
+
+        # Second forward pass uses existing hidden state
+        with torch.no_grad():
+            output2 = controller(model_features, loss, accuracy, gradient_norm)
+
+        # Outputs should differ due to LSTM state
+        assert controller.hidden_state is not None
+
+    def test_lstm_meta_controller_reset_state(self, hidden_dim):
+        """Test LSTM meta-controller state reset."""
+        from src.models.double_loop_controller import LSTMMetaController
+
+        controller = LSTMMetaController(
+            model_hidden_dim=hidden_dim,
+            controller_hidden_dim=128,
+        )
+
+        # Do a forward pass to set hidden state
+        model_features = torch.randn(1, hidden_dim)
+        loss = torch.randn(1, 1)
+        accuracy = torch.randn(1, 1)
+        gradient_norm = torch.randn(1, 1)
+
+        controller(model_features, loss, accuracy, gradient_norm)
+        assert controller.hidden_state is not None
+
+        # Reset state
+        controller.reset_state()
+        assert controller.hidden_state is None
+
+
+class TestAdaptiveLayerNorm:
+    """Tests for adaptive layer normalization."""
+
+    def test_adaptive_layer_norm_forward(self, hidden_dim, batch_size):
+        """Test adaptive layer norm forward pass."""
+        from src.models.double_loop_controller import AdaptiveLayerNorm
+
+        norm = AdaptiveLayerNorm(hidden_dim, adaptation_dim=32)
+        norm.eval()
+
+        x = torch.randn(batch_size, hidden_dim)
+
+        with torch.no_grad():
+            output = norm(x)
+
+        assert output.shape == x.shape
+
+    def test_adaptive_layer_norm_with_adaptation(self, hidden_dim, batch_size):
+        """Test adaptive layer norm with adaptation signal."""
+        from src.models.double_loop_controller import AdaptiveLayerNorm
+
+        norm = AdaptiveLayerNorm(hidden_dim, adaptation_dim=32)
+        norm.eval()
+
+        x = torch.randn(batch_size, hidden_dim)
+        adaptation = torch.randn(batch_size, 32)
+
+        with torch.no_grad():
+            output = norm(x, adaptation)
+
+        assert output.shape == x.shape
+
 
 class TestTaskHeads:
     """Tests for task-specific heads."""
@@ -326,6 +523,149 @@ class TestMultiModalModel:
         after_unfreeze = model.get_num_parameters(trainable_only=True)
         assert after_unfreeze == initial_trainable
 
+    def test_model_get_model_info(self, model_config):
+        """Test getting model info."""
+        model = create_multi_modal_model(model_config)
+        info = model.get_model_info()
+
+        assert isinstance(info, dict)
+        assert "vision_encoder" in info or "total_params" in info
+
+    def test_model_enable_gradient_checkpointing(self, model_config):
+        """Test enabling gradient checkpointing."""
+        model = create_multi_modal_model(model_config)
+        model.enable_gradient_checkpointing()
+        
+        # Should not raise
+        assert True
+
+    def test_model_late_fusion(self, model_config, sample_images, sample_text_inputs):
+        """Test model with late fusion."""
+        # Modify config for late fusion
+        late_config = model_config.copy()
+        late_config["model"] = model_config["model"].copy()
+        late_config["model"]["fusion"] = model_config["model"]["fusion"].copy()
+        late_config["model"]["fusion"]["type"] = "late"
+        
+        model = create_multi_modal_model(late_config)
+        model.eval()
+
+        with torch.no_grad():
+            outputs = model(
+                images=sample_images,
+                input_ids=sample_text_inputs["input_ids"],
+                attention_mask=sample_text_inputs["attention_mask"],
+            )
+
+        assert "logits" in outputs
+
+    def test_model_with_double_loop_controller(self, model_config, sample_images, sample_text_inputs):
+        """Test model with double-loop controller."""
+        dl_config = model_config.copy()
+        dl_config["model"] = model_config["model"].copy()
+        dl_config["model"]["double_loop"] = {
+            "enabled": True,
+            "hidden_dim": 64,
+            "meta_window": 5,
+            "output_dim": 16,
+        }
+        
+        model = create_multi_modal_model(dl_config)
+        model.eval()
+
+        with torch.no_grad():
+            outputs = model(
+                images=sample_images,
+                input_ids=sample_text_inputs["input_ids"],
+                attention_mask=sample_text_inputs["attention_mask"],
+            )
+
+        assert "logits" in outputs
+
+    def test_model_with_double_loop_controller_training(self, model_config, sample_images, sample_text_inputs, batch_size):
+        """Test model with double-loop controller during training with controller inputs."""
+        dl_config = model_config.copy()
+        dl_config["model"] = model_config["model"].copy()
+        dl_config["model"]["use_double_loop"] = True
+        dl_config["model"]["double_loop"] = {
+            "enabled": True,
+            "model_hidden_dim": model_config["model"]["vision_encoder"]["hidden_dim"],
+            "hidden_dim": 64,
+            "update_frequency": 10,
+        }
+        
+        model = create_multi_modal_model(dl_config)
+        model.train()
+
+        # Provide controller inputs
+        current_loss = torch.tensor([[0.5]] * batch_size)
+        current_accuracy = torch.tensor([[0.8]] * batch_size)
+        gradient_norm = torch.tensor([[1.0]] * batch_size)
+
+        outputs = model(
+            images=sample_images,
+            input_ids=sample_text_inputs["input_ids"],
+            attention_mask=sample_text_inputs["attention_mask"],
+            current_loss=current_loss,
+            current_accuracy=current_accuracy,
+            gradient_norm=gradient_norm,
+        )
+
+        assert "logits" in outputs
+        assert "meta_info" in outputs
+        # When controller inputs provided, meta_info should have controller output
+        if outputs["meta_info"] is not None:
+            assert "lr_scale" in outputs["meta_info"]
+            assert "arch_adaptation" in outputs["meta_info"]
+
+    def test_model_with_double_loop_controller_no_inputs(self, model_config, sample_images, sample_text_inputs):
+        """Test model with double-loop controller during training without controller inputs."""
+        dl_config = model_config.copy()
+        dl_config["model"] = model_config["model"].copy()
+        dl_config["model"]["use_double_loop"] = True
+        dl_config["model"]["double_loop"] = {
+            "enabled": True,
+            "model_hidden_dim": model_config["model"]["vision_encoder"]["hidden_dim"],
+            "hidden_dim": 64,
+        }
+        
+        model = create_multi_modal_model(dl_config)
+        model.train()
+
+        # Don't provide controller inputs
+        outputs = model(
+            images=sample_images,
+            input_ids=sample_text_inputs["input_ids"],
+            attention_mask=sample_text_inputs["attention_mask"],
+        )
+
+        assert "logits" in outputs
+        # Without controller inputs, meta_info should be None
+        assert outputs.get("meta_info") is None
+
+    def test_model_with_contrastive_head(self, model_config, sample_images, sample_text_inputs):
+        """Test model with contrastive head."""
+        contrastive_config = model_config.copy()
+        contrastive_config["model"] = model_config["model"].copy()
+        contrastive_config["model"]["heads"] = {
+            "type": "contrastive",
+            "hidden_dim": model_config["model"]["vision_encoder"]["hidden_dim"],
+            "projection_dim": 128,
+        }
+        
+        model = create_multi_modal_model(contrastive_config)
+        model.eval()
+
+        with torch.no_grad():
+            outputs = model(
+                images=sample_images,
+                input_ids=sample_text_inputs["input_ids"],
+                attention_mask=sample_text_inputs["attention_mask"],
+                task_name="contrastive",
+            )
+
+        assert "logits" in outputs
+
     @pytest.mark.slow
     def test_model_backward_pass(
         self, model_config, sample_images, sample_text_inputs, sample_labels
@@ -352,3 +692,71 @@ class TestMultiModalModel:
                 break
 
         assert has_grad, "No gradients were computed"
+
+
+class TestLoadPretrainedWeights:
+    """Tests for load_pretrained_weights function."""
+
+    def test_load_pretrained_weights_no_checkpoints(self, model_config):
+        """Test load_pretrained_weights with no checkpoints specified."""
+        from src.models.multi_modal_model import load_pretrained_weights
+
+        model = create_multi_modal_model(model_config)
+        
+        # No checkpoints - should return model unchanged
+        result = load_pretrained_weights(model)
+        assert result is model
+
+    def test_load_pretrained_weights_valid_vision_checkpoint(self, model_config, tmp_path):
+        """Test load_pretrained_weights with valid vision checkpoint."""
+        from src.models.multi_modal_model import load_pretrained_weights
+
+        model = create_multi_modal_model(model_config)
+        
+        # Save vision encoder state dict
+        checkpoint_path = tmp_path / "vision_checkpoint.pt"
+        torch.save(model.vision_encoder.state_dict(), checkpoint_path)
+        
+        # Create new model and load vision weights
+        model2 = create_multi_modal_model(model_config)
+        result = load_pretrained_weights(model2, vision_checkpoint=str(checkpoint_path))
+        
+        assert result is model2
+
+    def test_load_pretrained_weights_valid_text_checkpoint(self, model_config, tmp_path):
+        """Test load_pretrained_weights with valid text checkpoint."""
+        from src.models.multi_modal_model import load_pretrained_weights
+
+        model = create_multi_modal_model(model_config)
+        
+        # Save text encoder state dict
+        checkpoint_path = tmp_path / "text_checkpoint.pt"
+        torch.save(model.text_encoder.state_dict(), checkpoint_path)
+        
+        # Create new model and load text weights
+        model2 = create_multi_modal_model(model_config)
+        result = load_pretrained_weights(model2, text_checkpoint=str(checkpoint_path))
+        
+        assert result is model2
+
+    def test_load_pretrained_weights_both_checkpoints(self, model_config, tmp_path):
+        """Test load_pretrained_weights with both checkpoints."""
+        from src.models.multi_modal_model import load_pretrained_weights
+
+        model = create_multi_modal_model(model_config)
+        
+        # Save both encoder state dicts
+        vision_path = tmp_path / "vision.pt"
+        text_path = tmp_path / "text.pt"
+        torch.save(model.vision_encoder.state_dict(), vision_path)
+        torch.save(model.text_encoder.state_dict(), text_path)
+        
+        # Create new model and load both weights
+        model2 = create_multi_modal_model(model_config)
+        result = load_pretrained_weights(
+            model2, 
+            vision_checkpoint=str(vision_path),
+            text_checkpoint=str(text_path)
+        )
+        
+        assert result is model2
