@@ -169,11 +169,11 @@ pip install -r requirements.txt
 
 **Progress Display:**
 ```
-Collecting torch>=2.1.0
-  Downloading torch-2.2.0-cp311-cp311-win_amd64.whl (198.5 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 198.5/198.5 MB 10.5 MB/s
+Collecting torch>=2.8.0
+  Downloading torch-2.8.0-cp311-cp311-win_amd64.whl (210.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 210.5/210.5 MB 10.5 MB/s
 ...
-Successfully installed torch-2.2.0 transformers-4.36.0 ...
+Successfully installed torch-2.8.0 transformers-4.57.3 ...
 ```
 
 ### Step 4: Install GPU Support (Optional)
@@ -196,7 +196,7 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {
 
 **Expected Output (with GPU):**
 ```
-PyTorch: 2.2.0+cu121
+PyTorch: 2.8.0+cu124
 CUDA: True
 ```
 
