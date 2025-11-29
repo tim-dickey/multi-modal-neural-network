@@ -45,4 +45,4 @@ requests>=2.32.4,<3
 # Prefer safetensors for safer checkpoint serialization
 safetensors>=0.4.0
 # Required by transformers
-huggingface-hub>=0.17.0,<1
+huggingface-hub>=0.17.0,<2
