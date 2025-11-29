@@ -6,12 +6,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .training_defaults import LOSS
+
 
 class CrossEntropyLoss(nn.Module):
     """Standard cross-entropy loss for classification."""
 
-    def __init__(self, label_smoothing: float = 0.0):
+    def __init__(self, label_smoothing: Optional[float] = None):
         super().__init__()
+        if label_smoothing is None:
+            label_smoothing = LOSS.label_smoothing
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -28,8 +32,10 @@ class CrossEntropyLoss(nn.Module):
 class ContrastiveLoss(nn.Module):
     """Contrastive loss for image-text matching (CLIP-style)."""
 
-    def __init__(self, temperature: float = 0.07):
+    def __init__(self, temperature: Optional[float] = None):
         super().__init__()
+        if temperature is None:
+            temperature = LOSS.contrastive_temperature
         self.temperature = temperature
 
     def forward(
@@ -64,8 +70,16 @@ class ContrastiveLoss(nn.Module):
 class FocalLoss(nn.Module):
     """Focal loss for handling class imbalance."""
 
-    def __init__(self, alpha: float = 0.25, gamma: float = 2.0):
+    def __init__(
+        self,
+        alpha: Optional[float] = None,
+        gamma: Optional[float] = None,
+    ):
         super().__init__()
+        if alpha is None:
+            alpha = LOSS.focal_alpha
+        if gamma is None:
+            gamma = LOSS.focal_gamma
         self.alpha = alpha
         self.gamma = gamma
 
@@ -159,7 +173,7 @@ class MetaLoss(nn.Module):
         meta_loss = meta_info["meta_loss"].mean()
 
         # Meta-loss encourages the controller to predict future loss trends
-        combined_loss = task_loss + 0.1 * meta_loss
+        combined_loss = task_loss + LOSS.meta_loss_weight * meta_loss
 
         return cast(torch.Tensor, combined_loss)
 
@@ -178,16 +192,20 @@ def create_loss_function(config: Dict) -> nn.Module:
 
     if loss_type == "cross_entropy":
         return CrossEntropyLoss(
-            label_smoothing=config.get("training", {}).get("label_smoothing", 0.0)
+            label_smoothing=config.get("training", {}).get(
+                "label_smoothing", LOSS.label_smoothing
+            )
         )
     elif loss_type == "contrastive":
         return ContrastiveLoss(
-            temperature=config.get("training", {}).get("temperature", 0.07)
+            temperature=config.get("training", {}).get(
+                "temperature", LOSS.contrastive_temperature
+            )
         )
     elif loss_type == "focal":
         return FocalLoss(
-            alpha=config.get("training", {}).get("focal_alpha", 0.25),
-            gamma=config.get("training", {}).get("focal_gamma", 2.0),
+            alpha=config.get("training", {}).get("focal_alpha", LOSS.focal_alpha),
+            gamma=config.get("training", {}).get("focal_gamma", LOSS.focal_gamma),
         )
     elif loss_type == "multitask":
         # Define task-specific losses

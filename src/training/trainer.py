@@ -16,6 +16,7 @@ from ..utils.config import load_config, save_config, validate_config
 from ..utils.logging import log_model_info
 from .checkpoint_manager import CheckpointManager
 from .device_manager import DeviceManager
+from .training_defaults import DATA, TRAINING
 from .training_state import LoggingManager, TrainingComponentsFactory, TrainingState
 
 
@@ -174,17 +175,17 @@ class Trainer:
         data_config = self.config.get("data", {})
         self.train_loader = create_dataloader(
             train_dataset,
-            batch_size=data_config.get("batch_size", 32),
-            num_workers=data_config.get("num_workers", 4),
+            batch_size=data_config.get("batch_size", DATA.batch_size),
+            num_workers=data_config.get("num_workers", DATA.num_workers),
             shuffle=True,
-            pin_memory=data_config.get("pin_memory", True),
+            pin_memory=data_config.get("pin_memory", DATA.pin_memory),
         )
         self.val_loader = create_dataloader(
             val_dataset,
-            batch_size=data_config.get("batch_size", 32),
-            num_workers=data_config.get("num_workers", 4),
+            batch_size=data_config.get("batch_size", DATA.batch_size),
+            num_workers=data_config.get("num_workers", DATA.num_workers),
             shuffle=False,
-            pin_memory=data_config.get("pin_memory", True),
+            pin_memory=data_config.get("pin_memory", DATA.pin_memory),
         )
         self.test_loader = None
         n_train = (
@@ -261,7 +262,7 @@ class Trainer:
         # Support both `max_epochs` and `num_epochs`
         max_epochs = self.config.get("training", {}).get(
             "max_epochs",
-            self.config.get("training", {}).get("num_epochs", 50),
+            self.config.get("training", {}).get("num_epochs", TRAINING.max_epochs),
         )
 
         self.logger.info("Starting training...")
@@ -352,7 +353,9 @@ class Trainer:
             loss.backward()
 
             # Optional gradient clipping
-            clip_val = self.config.get("training", {}).get("gradient_clip", 0.0)
+            clip_val = self.config.get("training", {}).get(
+                "gradient_clip", TRAINING.gradient_clip
+            )
             if clip_val and clip_val > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), clip_val)
 
@@ -365,7 +368,14 @@ class Trainer:
             total_samples += int(batch["labels"].size(0))
 
             # Ensure a sane log interval (avoid zero or non-int config values)
-            log_interval = max(1, int(self.config.get("training", {}).get("log_interval", 10)))
+            log_interval = max(
+                1,
+                int(
+                    self.config.get("training", {}).get(
+                        "log_interval", TRAINING.log_interval
+                    )
+                ),
+            )
             if (batch_idx % log_interval) == 0:
                 # Use logger formatting to keep line lengths short
                 self.logger.info(
