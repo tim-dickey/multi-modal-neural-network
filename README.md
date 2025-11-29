@@ -116,6 +116,23 @@ This repository contains an open-source implementation of a multi-modal small ne
    trainer.train()
    ```
 
+## 📖 User Guide
+
+For comprehensive documentation, see the **[User Guide](docs/USER_GUIDE.md)** which covers:
+
+| Section | Description |
+|---------|-------------|
+| **Installation Guide** | Step-by-step setup with verification commands |
+| **Configuration Guide** | Hardware, model, training, and data configuration options |
+| **Hardware Detection** | Automatic GPU/NPU detection with example outputs |
+| **Training Workflow** | CLI, Python API, and Jupyter notebook training methods |
+| **Inference Guide** | Single and batch inference with code examples |
+| **Development Tools** | Make commands, testing, linting, and type checking |
+| **Troubleshooting** | Common issues (CUDA, memory, imports) with solutions |
+| **Quick Reference** | Essential commands and Python API cheat sheet |
+
+The User Guide includes Mermaid diagrams for system architecture, training pipelines, and troubleshooting flowcharts.
+
 ## Environment Setup
 
 Create a `.env` file in the project root with your API keys:
