@@ -133,6 +133,13 @@ For comprehensive documentation, see the **[User Guide](docs/USER_GUIDE.md)** wh
 
 The User Guide includes Mermaid diagrams for system architecture, training pipelines, and troubleshooting flowcharts.
 
+## 📚 Additional Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Software Development Best Practices](Software%20development%20best%20practices.md)** | Coding standards, testing guidelines, and quality assurance practices |
+| **[PRD Assessment](docs/PRD_ASSESSMENT.md)** | Product Requirements Document with project scope and specifications |
+
 ## Environment Setup
 
 Create a `.env` file in the project root with your API keys:
