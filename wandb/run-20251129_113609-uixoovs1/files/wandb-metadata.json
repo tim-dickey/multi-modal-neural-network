@@ -1,0 +1,44 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "CPython 3.13.9",
+  "startedAt": "2025-11-29T17:36:09.650553Z",
+  "args": [
+    "tests/",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "-q"
+  ],
+  "program": "-m pytest.__main__",
+  "git": {
+    "remote": "https://github.com/tim-dickey/multi-modal-neural-network.git",
+    "commit": "068cf091c3b14417239b6f4128ac97ed89cb47e2"
+  },
+  "email": "tim.dickey@gmail.com",
+  "root": "C:\\Users\\tdick\\OneDrive\\Documents\\GitHub\\multi-modal-neural-network",
+  "host": "CORSAIRONE",
+  "executable": "C:\\Users\\tdick\\OneDrive\\Documents\\GitHub\\multi-modal-neural-network\\.venv\\Scripts\\python.exe",
+  "cpu_count": 24,
+  "cpu_count_logical": 32,
+  "gpu": "NVIDIA GeForce RTX 4080 SUPER",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1999227580416",
+      "used": "1494376804352"
+    }
+  },
+  "memory": {
+    "total": "68486418432"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4080 SUPER",
+      "memoryTotal": "17171480576",
+      "cudaCores": 10240,
+      "architecture": "Ada",
+      "uuid": "GPU-5b4f817f-0006-aa9d-dfe1-66bc1869ad85"
+    }
+  ],
+  "cudaVersion": "13.0",
+  "writerId": "ixaxmddw6u06nlwk9htjixkicj64b2l1"
+}
