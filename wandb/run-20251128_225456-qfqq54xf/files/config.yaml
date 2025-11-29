@@ -1,0 +1,67 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            04etp2o4qpblm4tqo7zzlsysw8jqtegl:
+                args:
+                    - --tb=short
+                    - -q
+                cpu_count: 24
+                cpu_count_logical: 32
+                cudaVersion: "13.0"
+                disk:
+                    /:
+                        total: "1999227580416"
+                        used: "1496163889152"
+                email: tim.dickey@gmail.com
+                executable: C:\Users\tdick\OneDrive\Documents\GitHub\multi-modal-neural-network\.venv\Scripts\python.exe
+                git:
+                    commit: e0ca0cb9147bcefeae35a034e51bc466f144b2ba
+                    remote: https://github.com/tim-dickey/multi-modal-neural-network.git
+                gpu: NVIDIA GeForce RTX 4080 SUPER
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 10240
+                      memoryTotal: "17171480576"
+                      name: NVIDIA GeForce RTX 4080 SUPER
+                      uuid: GPU-5b4f817f-0006-aa9d-dfe1-66bc1869ad85
+                host: CORSAIRONE
+                memory:
+                    total: "68486418432"
+                os: Windows-11-10.0.26200-SP0
+                program: -m pytest.__main__
+                python: CPython 3.13.9
+                root: C:\Users\tdick\OneDrive\Documents\GitHub\multi-modal-neural-network
+                startedAt: "2025-11-29T04:54:56.623638Z"
+                writerId: 04etp2o4qpblm4tqo7zzlsysw8jqtegl
+        m: []
+        python_version: 3.13.9
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+            "2":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+            "3":
+                - 13
+                - 16
+            "4": 3.13.9
+            "5": 0.23.0
+            "6": 4.57.3
+            "8":
+                - 3
+            "12": 0.23.0
+            "13": windows-amd64
+paths:
+    value:
+        log_dir: C:\Users\tdick\AppData\Local\Temp\pytest-of-tdick\pytest-150\test_init_creates_log_dir0\logs
