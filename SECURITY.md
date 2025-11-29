@@ -6,8 +6,9 @@ The following versions of the multi-modal neural network project currently recei
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| 5.1.x   | :white_check_mark: |
+| 4.0.x   | :white_check_mark: |
+| < 4.0   | :x:                |
 
 ## Reporting a Vulnerability
 
