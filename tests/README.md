@@ -2,6 +2,8 @@
 
 This directory contains the comprehensive test suite for the Multi-Modal Neural Network project.
 
+**Current Status:** 446 tests passing with 93% coverage
+
 ## Test Structure
 
 ```
@@ -10,12 +12,27 @@ tests/
 ├── test_models.py           # Tests for model components
 ├── test_training.py         # Tests for training utilities
 ├── test_data.py             # Tests for data pipeline
-└── test_integration.py      # End-to-end integration tests
+├── test_integration.py      # End-to-end integration tests (28 tests)
+├── test_gpu_utils.py        # GPU detection and configuration tests
+├── test_npu_utils.py        # NPU detection tests
+├── test_safe_load.py        # Checkpoint loading tests
+└── ...                      # Additional test modules
 ```
 
 ## Running Tests
 
-### Quick Start
+### Quick Start (Recommended)
+
+Use the Makefile for common testing tasks:
+```bash
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-cov
+```
+
+### Shell Scripts
 
 Run all unit tests (excluding slow and integration tests):
 ```bash
@@ -211,36 +228,33 @@ Tests are designed to work in CI environments:
 3. **GPU optional**: Tests skip GPU tests when CUDA unavailable
 4. **Deterministic**: Fixed random seeds for reproducibility
 5. **Clean state**: Each test is isolated with fixtures
+6. **Multi-version testing**: CI runs Python 3.11, 3.12, and 3.13
+7. **Coverage reporting**: Automatic coverage reports on pull requests
 
-### CI Configuration Example
+### GitHub Actions Workflow
+
+The project uses `.github/workflows/tests.yml` for CI/CD:
 
 ```yaml
-# .github/workflows/test.yml
-name: Tests
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
-    
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
-    
-    - name: Run unit tests
-      run: ./run_tests.sh --unit --coverage
-    
-    - name: Run integration tests
-      run: ./run_tests.sh --integration
+# Key features:
+# - Multi-version Python matrix (3.11, 3.12, 3.13)
+# - Dependency caching for fast builds
+# - Coverage reporting
+# - Pre-commit hook validation
 ```
+
+### Pre-commit Hooks
+
+Install pre-commit hooks for local development:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Hooks run automatically on commit:
+- **ruff**: Fast linting and formatting
+- **bandit**: Security vulnerability scanning
+- **pytest**: Quick test validation
 
 ## Troubleshooting
 
