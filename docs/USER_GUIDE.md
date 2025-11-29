@@ -168,6 +168,9 @@ pip install -r requirements.txt
 ```
 
 **Progress Display:**
+
+> **Note:** Version numbers in this example are illustrative and may differ from actual releases. Your installation will show the latest available versions.
+
 ```
 Collecting torch>=2.0.0
   Downloading torch-2.5.1-cp311-cp311-win_amd64.whl (210.5 MB)
@@ -197,6 +200,9 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {
 ```
 
 **Expected Output (with GPU):**
+
+> **Note:** Version numbers shown are illustrative. Your actual output will reflect the installed version.
+
 ```
 PyTorch: 2.3.0+cu121
 CUDA: True
