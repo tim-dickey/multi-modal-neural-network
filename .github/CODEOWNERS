@@ -1,0 +1,6 @@
+# Global owners
+*       @tim-dickey
+
+# Tighten specific critical areas if you want
+/models/ @tim-dickey
+/src/    @tim-dickey
