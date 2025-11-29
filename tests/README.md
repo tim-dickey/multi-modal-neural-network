@@ -4,6 +4,32 @@ This directory contains the comprehensive test suite for the Multi-Modal Neural 
 
 **Current Status:** 446 tests passing with 93% coverage
 
+## Test Pipeline Overview
+
+```mermaid
+flowchart LR
+    subgraph Local["🖥️ Local Development"]
+        CODE[Write Code] --> PRECOMMIT[Pre-commit<br/>Hooks]
+        PRECOMMIT --> UNIT[Unit Tests]
+        UNIT --> COMMIT[Commit]
+    end
+    
+    subgraph CI["☁️ GitHub Actions"]
+        PUSH[Push] --> MATRIX[Python Matrix]
+        MATRIX --> PY311[3.11]
+        MATRIX --> PY312[3.12]
+        MATRIX --> PY313[3.13]
+        PY311 & PY312 & PY313 --> INTEG[Integration<br/>Tests]
+        INTEG --> COV[Coverage<br/>Report]
+    end
+    
+    COMMIT --> PUSH
+    COV --> PR[Pull Request]
+    
+    style PRECOMMIT fill:#FFC107
+    style COV fill:#4CAF50
+```
+
 ## Test Structure
 
 ```

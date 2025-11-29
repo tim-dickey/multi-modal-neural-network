@@ -186,6 +186,114 @@ multi-modal-neural-network/
 │   └── NPU_TRAINING.md            # NPU configuration guide
 └── examples/                      # Usage examples
 ```
+
+## Architecture Overview
+
+### Model Architecture
+
+```mermaid
+graph TB
+    subgraph Input["Input Layer"]
+        IMG[🖼️ Image Input]
+        TXT[📝 Text Input]
+    end
+    
+    subgraph Encoders["Encoders"]
+        VE[Vision Encoder<br/>ViT]
+        TE[Text Encoder<br/>BERT]
+    end
+    
+    subgraph Fusion["Multi-Modal Fusion"]
+        FL[Fusion Layer<br/>Cross-Attention]
+        DLC[Double-Loop<br/>Controller]
+    end
+    
+    subgraph Heads["Task Heads"]
+        CLS[Classification<br/>Head]
+        GEN[Generation<br/>Head]
+        RET[Retrieval<br/>Head]
+    end
+    
+    IMG --> VE
+    TXT --> TE
+    VE --> FL
+    TE --> FL
+    FL <--> DLC
+    FL --> CLS
+    FL --> GEN
+    FL --> RET
+    
+    subgraph External["External Knowledge"]
+        WA[🔗 Wolfram Alpha<br/>API]
+    end
+    
+    DLC <-.-> WA
+```
+
+### Training Pipeline
+
+```mermaid
+flowchart LR
+    subgraph Data["Data Pipeline"]
+        DS[(Dataset)]
+        DL[DataLoader]
+        AUG[Augmentation]
+    end
+    
+    subgraph Training["Training Loop"]
+        FWD[Forward Pass]
+        LOSS[Loss Calculation]
+        BWD[Backward Pass]
+        OPT[Optimizer Step]
+    end
+    
+    subgraph Monitoring["Monitoring"]
+        CKPT[Checkpointing]
+        LOG[Logging]
+        EVAL[Validation]
+    end
+    
+    DS --> DL --> AUG --> FWD
+    FWD --> LOSS --> BWD --> OPT
+    OPT --> FWD
+    
+    OPT --> CKPT
+    OPT --> LOG
+    OPT -.-> EVAL
+```
+
+### Development Workflow
+
+```mermaid
+flowchart TD
+    subgraph Local["Local Development"]
+        CODE[Write Code]
+        PRE[Pre-commit Hooks<br/>ruff, bandit, pytest]
+        TEST[Run Tests<br/>make test]
+    end
+    
+    subgraph CI["CI/CD Pipeline"]
+        PUSH[Push to GitHub]
+        GHA[GitHub Actions]
+        PY311[Python 3.11]
+        PY312[Python 3.12]
+        PY313[Python 3.13]
+        COV[Coverage Report]
+    end
+    
+    subgraph Review["Code Review"]
+        PR[Pull Request]
+        REV[Review]
+        MERGE[Merge to Main]
+    end
+    
+    CODE --> PRE --> TEST --> PUSH
+    PUSH --> GHA
+    GHA --> PY311 & PY312 & PY313
+    PY311 & PY312 & PY313 --> COV
+    COV --> PR --> REV --> MERGE
+```
+
 ## API Integration Framework
 
 The project includes a flexible API integration framework designed for external knowledge sources:

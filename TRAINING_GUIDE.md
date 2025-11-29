@@ -2,6 +2,44 @@
 
 This guide provides instructions for training and using the multi-modal neural network.
 
+## Training Overview
+
+```mermaid
+flowchart TD
+    subgraph Setup["1️⃣ Setup"]
+        INSTALL[Install Dependencies]
+        CONFIG[Configure Settings]
+        HW[Hardware Detection]
+    end
+    
+    subgraph Data["2️⃣ Data Preparation"]
+        DS[(Select Datasets)]
+        SPLIT[Train/Val/Test Split]
+        AUG[Configure Augmentation]
+    end
+    
+    subgraph Train["3️⃣ Training"]
+        INIT[Initialize Model]
+        LOOP[Training Loop]
+        CKPT[Save Checkpoints]
+        VAL[Validation]
+    end
+    
+    subgraph Deploy["4️⃣ Deployment"]
+        EVAL[Evaluate Model]
+        EXPORT[Export to ONNX]
+        INF[Run Inference]
+    end
+    
+    INSTALL --> CONFIG --> HW
+    HW --> DS --> SPLIT --> AUG
+    AUG --> INIT --> LOOP
+    LOOP --> CKPT
+    LOOP --> VAL
+    VAL --> LOOP
+    CKPT --> EVAL --> EXPORT --> INF
+```
+
 ## Quick Start
 
 ### 1. Installation
