@@ -51,7 +51,7 @@ jobs:
           ls -la test_logs/codacy || echo "No SARIF files found"
 
       - name: Upload SARIF artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: codacy-sarif
           path: |
