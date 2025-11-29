@@ -557,7 +557,6 @@ def test_detect_windows_directml_npu_non_windows(monkeypatch):
 
 def test_detect_windows_directml_npu_available(monkeypatch):
     # Test DirectML detection when available
-    import sys
     import types
 
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Windows")
@@ -577,7 +576,6 @@ def test_detect_windows_directml_npu_available(monkeypatch):
 
 def test_detect_windows_directml_npu_no_devices(monkeypatch):
     # Test DirectML detection when no devices
-    import sys
     import types
 
     monkeypatch.setattr(npu_utils.platform, "system", lambda: "Windows")

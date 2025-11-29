@@ -1,14 +1,10 @@
 """Integration tests for the multi-modal neural network."""
 
 import json
-import tempfile
-from pathlib import Path
-from typing import Any, Dict
 from unittest.mock import Mock, patch
 
 import pytest
 import torch
-import yaml
 
 from src.data.dataset import (
     MultiModalDataset,

@@ -1,6 +1,7 @@
 """Tests for subprocess_utils module."""
 
 import subprocess
+import tempfile
 
 import pytest
 
@@ -95,9 +96,10 @@ class TestSafeSubprocessRun:
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
-        res = _safe_subprocess_run(["fakecmd"], timeout=1, cwd="/tmp")
+        tmp_dir = tempfile.gettempdir()
+        res = _safe_subprocess_run(["fakecmd"], timeout=1, cwd=tmp_dir)
         assert res is not None
-        assert cwd_used == "/tmp"
+        assert cwd_used == tmp_dir
 
     def test_safe_subprocess_run_with_args(self, monkeypatch):
         """Test command with arguments."""

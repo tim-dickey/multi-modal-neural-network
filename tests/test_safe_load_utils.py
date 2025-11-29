@@ -1,5 +1,4 @@
 import sys
-import tempfile
 
 import torch
 
@@ -27,7 +26,7 @@ def test_safe_load_torch_file(tmp_path):
 
 def test_safe_load_safetensors_path(monkeypatch, tmp_path):
     # Simulate safetensors loader being available
-    mod = types = type("M", (), {})()
+    mod = type("M", (), {})()
     def fake_load_file(path, device="cpu"):
         return {"a": torch.tensor([1])}
 
@@ -186,29 +185,6 @@ def test_safe_load_rejects_uppercase_http():
 def test_safe_load_untrusted_path_rejected(monkeypatch, tmp_path):
     import pytest
 
-    # Simulate an external path that is not in trusted roots
-    # Create a file outside of repo/tmp
-    external_path = "/some/external/untrusted/model.pt"
-
-    # Monkeypatch Path.resolve to return a path outside trusted roots
-    original_resolve = safe_load.Path.resolve
-
-    class FakePath:
-        def __init__(self, p):
-            self.p = str(p)
-
-        def resolve(self):
-            return self
-
-        def is_relative_to(self, other):
-            return False
-
-        def __str__(self):
-            return self.p
-
-        def __fspath__(self):
-            return self.p
-
     # Since we can't easily mock Path behavior, test with allow_external=True
     # and verify the error message when rejecting
     with pytest.raises(ValueError, match="untrusted paths"):
@@ -242,7 +218,7 @@ def test_safetensors_map_location_none(monkeypatch, tmp_path):
     p = tmp_path / "weights_none.safetensors"
     p.write_bytes(b"x")
 
-    loaded = safe_load.safe_load_checkpoint(str(p), map_location=None)
+    safe_load.safe_load_checkpoint(str(p), map_location=None)
     assert captured_device[0] == "cpu"
 
 
@@ -281,7 +257,7 @@ def test_safetensors_map_location_cuda_string(monkeypatch, tmp_path):
 
     # This will try to move tensor to cuda:0 - may fail without CUDA
     # but the device string normalization should work
-    loaded = safe_load.safe_load_checkpoint(str(p), map_location="cpu")
+    safe_load.safe_load_checkpoint(str(p), map_location="cpu")
     assert captured_device[0] == "cpu"
 
 
@@ -398,8 +374,6 @@ def test_safetensors_device_normalization_exception(monkeypatch, tmp_path):
 
 def test_resolve_path_exception(monkeypatch, tmp_path):
     # Test when path resolve fails
-    import pytest
-
     # Create a valid file first
     p = tmp_path / "valid.pt"
     data = {"model": torch.tensor([1.0])}
