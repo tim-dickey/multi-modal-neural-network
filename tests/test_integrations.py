@@ -229,6 +229,24 @@ class TestWolframAlphaIntegration:
         assert "limit exceeded" in response.error.lower()
 
     @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_query_not_success(self, mock_client_class):
+        """Test Wolfram Alpha query when result.success is False."""
+        mock_client = Mock()
+        mock_result = Mock()
+        mock_result.success = False
+        mock_result.pods = []
+
+        mock_client.query.return_value = mock_result
+        mock_client_class.return_value = mock_client
+
+        integration = WolframAlphaIntegration("test_key", {})
+        response = integration.query("invalid query")
+
+        assert response.success is False
+        assert response.error == "Wolfram Alpha query failed"
+        assert response.metadata["query"] == "invalid query"
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
     def test_wolfram_extract_result(self, mock_client_class):
         """Test mathematical result extraction."""
         mock_client_class.return_value = Mock()
@@ -254,6 +272,151 @@ class TestWolframAlphaIntegration:
         empty_response = APIResponse(success=True, data=[])
         result = integration.extract_mathematical_result(empty_response)
         assert result is None
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_extract_result_fallback(self, mock_client_class):
+        """Test extraction falls back to first pod with plaintext."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        # Response with no "Result" or "Solution" pod, but has plaintext
+        response = APIResponse(
+            success=True,
+            data=[
+                {
+                    "title": "Input",
+                    "id": "input",
+                    "subpods": [{"title": "", "plaintext": "original input", "img": None}],
+                }
+            ],
+        )
+
+        result = integration.extract_mathematical_result(response)
+        assert result == "original input"
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_extract_result_no_plaintext(self, mock_client_class):
+        """Test extraction when no pod has plaintext."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        # Response where no subpod has plaintext
+        response = APIResponse(
+            success=True,
+            data=[
+                {
+                    "title": "Input",
+                    "id": "input",
+                    "subpods": [{"title": "", "plaintext": None, "img": "image.png"}],
+                }
+            ],
+        )
+
+        result = integration.extract_mathematical_result(response)
+        assert result is None
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_not_success(self, mock_client_class):
+        """Test validate_response returns False when not successful."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=False, data=None)
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_no_data(self, mock_client_class):
+        """Test validate_response returns False when data is None."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=None)
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_not_list(self, mock_client_class):
+        """Test validate_response returns False when data is not a list."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data="not a list")
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_empty_list(self, mock_client_class):
+        """Test validate_response returns False for empty list."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=[])
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_pod_not_dict(self, mock_client_class):
+        """Test validate_response returns False when pod is not a dict."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=["not a dict"])
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_missing_title(self, mock_client_class):
+        """Test validate_response returns False when pod missing title."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=[{"subpods": []}])
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_missing_subpods(self, mock_client_class):
+        """Test validate_response returns False when pod missing subpods."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=[{"title": "Test"}])
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_response_subpods_not_list(self, mock_client_class):
+        """Test validate_response returns False when subpods is not a list."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        response = APIResponse(success=True, data=[{"title": "Test", "subpods": "not a list"}])
+        assert integration.validate_response(response) is False
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_query_exception(self, mock_client_class):
+        """Test query returns error response when exception is raised."""
+        mock_client = Mock()
+        mock_client.query.side_effect = Exception("Network error")
+        mock_client_class.return_value = mock_client
+
+        integration = WolframAlphaIntegration("test_key", {})
+        response = integration.query("test query")
+
+        assert response.success is False
+        assert "Wolfram Alpha API error" in response.error
+        assert "Network error" in response.error
+        assert response.metadata["query"] == "test query"
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_wolfram_validate_multiple_pods_mixed_validity(self, mock_client_class):
+        """Test validate_response when first pod is valid but second is invalid."""
+        mock_client_class.return_value = Mock()
+        integration = WolframAlphaIntegration("test_key", {})
+
+        # First pod valid, second pod invalid (missing title)
+        response = APIResponse(
+            success=True,
+            data=[
+                {"title": "Valid", "subpods": []},
+                {"subpods": []},  # Missing title
+            ]
+        )
+        assert integration.validate_response(response) is False
 
 
 class TestValidators:
@@ -737,6 +900,32 @@ class TestWolframKnowledgeInjector:
         for text, expected in test_cases:
             result = injector._extract_math_expressions(text)
             assert result == expected
+
+    def test_math_expression_extraction_non_string(self):
+        """Test _extract_math_expressions with non-string input."""
+        injector = WolframKnowledgeInjector(Mock(), {})
+
+        # Non-string input should return empty list
+        assert injector._extract_math_expressions(123) == []
+        assert injector._extract_math_expressions(None) == []
+        assert injector._extract_math_expressions(["list"]) == []
+
+    @patch("src.integrations.wolfram_alpha.wolframalpha.Client")
+    def test_inject_knowledge_no_math(self, mock_client_class):
+        """Test inject_knowledge when no math expressions are found."""
+        mock_client_class.return_value = Mock()
+
+        wolfram = WolframAlphaIntegration("test_key", {})
+        injector = WolframKnowledgeInjector(wolfram, {})
+
+        # Input with no math
+        input_data = "Hello world, no math here"
+        model_output = torch.randn(1, 256)
+
+        result = injector.inject_knowledge(input_data, model_output)
+
+        assert result["injected"] is False
+        assert "No mathematical expressions found" in result["reason"]
 
 
 @pytest.mark.asyncio

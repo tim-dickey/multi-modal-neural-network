@@ -126,6 +126,143 @@ class TestTextEncoder:
         assert cls_token is not None
         assert sequence_output is not None
 
+    def test_text_encoder_with_token_type_ids(self, text_encoder_config, batch_size, seq_length):
+        """Test text encoder forward pass with token_type_ids (segment embeddings)."""
+        encoder = create_text_encoder(text_encoder_config)
+        encoder.eval()
+
+        input_ids = torch.randint(0, 30522, (batch_size, seq_length))
+        attention_mask = torch.ones(batch_size, seq_length)
+        # Segment IDs: 0 for first half, 1 for second half
+        token_type_ids = torch.zeros(batch_size, seq_length, dtype=torch.long)
+        token_type_ids[:, seq_length // 2:] = 1
+
+        with torch.no_grad():
+            cls_token, sequence_output = encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+            )
+
+        assert cls_token.shape == (batch_size, text_encoder_config["hidden_dim"])
+        assert sequence_output.shape == (batch_size, seq_length, text_encoder_config["hidden_dim"])
+
+    def test_text_encoder_without_cls_token(self, batch_size):
+        """Test text encoder with use_cls_token=False (mean pooling)."""
+        seq_len = 32  # Use fixed short sequence length
+        config = {
+            "hidden_dim": 64,
+            "num_layers": 2,
+            "num_heads": 4,
+            "vocab_size": 1000,
+            "max_seq_length": 64,
+            "dropout": 0.0,
+            "use_cls_token": False,
+        }
+        encoder = create_text_encoder(config)
+        encoder.eval()
+
+        input_ids = torch.randint(0, 1000, (batch_size, seq_len))
+        attention_mask = torch.ones(batch_size, seq_len)
+        # Mask out some tokens
+        attention_mask[:, seq_len // 2:] = 0
+
+        with torch.no_grad():
+            pooled, sequence_output = encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            )
+
+        # Mean pooling output
+        assert pooled.shape == (batch_size, config["hidden_dim"])
+        assert sequence_output.shape == (batch_size, seq_len, config["hidden_dim"])
+
+    def test_text_encoder_without_cls_token_no_mask(self, batch_size):
+        """Test text encoder with use_cls_token=False and no attention mask."""
+        seq_len = 32  # Use fixed short sequence length
+        config = {
+            "hidden_dim": 64,
+            "num_layers": 2,
+            "num_heads": 4,
+            "vocab_size": 1000,
+            "max_seq_length": 64,
+            "dropout": 0.0,
+            "use_cls_token": False,
+        }
+        encoder = create_text_encoder(config)
+        encoder.eval()
+
+        input_ids = torch.randint(0, 1000, (batch_size, seq_len))
+
+        with torch.no_grad():
+            pooled, sequence_output = encoder(input_ids=input_ids)
+
+        # Simple mean pooling
+        assert pooled.shape == (batch_size, config["hidden_dim"])
+
+    def test_text_encoder_get_set_embeddings(self, text_encoder_config):
+        """Test get_input_embeddings and set_input_embeddings."""
+        encoder = create_text_encoder(text_encoder_config)
+
+        # Get embeddings
+        embeddings = encoder.get_input_embeddings()
+        assert isinstance(embeddings, torch.nn.Embedding)
+        assert embeddings.num_embeddings == text_encoder_config["vocab_size"]
+
+        # Create new embeddings and set
+        new_embeddings = torch.nn.Embedding(
+            text_encoder_config["vocab_size"],
+            text_encoder_config["hidden_dim"]
+        )
+        encoder.set_input_embeddings(new_embeddings)
+        assert encoder.get_input_embeddings() is new_embeddings
+
+
+class TestSimpleTokenizer:
+    """Tests for SimpleTokenizer."""
+
+    def test_tokenizer_creation(self):
+        """Test tokenizer can be created."""
+        from src.models.text_encoder import SimpleTokenizer
+        tokenizer = SimpleTokenizer(vocab_size=30522)
+        assert tokenizer.vocab_size == 30522
+        assert tokenizer.pad_token_id == 0
+        assert tokenizer.cls_token_id == 1
+        assert tokenizer.sep_token_id == 2
+        assert tokenizer.unk_token_id == 3
+
+    def test_tokenizer_encode(self):
+        """Test tokenizer encode method."""
+        from src.models.text_encoder import SimpleTokenizer
+        tokenizer = SimpleTokenizer(vocab_size=30522)
+
+        result = tokenizer.encode("Hello world", max_length=32)
+
+        assert "input_ids" in result
+        assert "attention_mask" in result
+        assert result["input_ids"].shape == (1, 32)
+        assert result["attention_mask"].shape == (1, 32)
+
+        # First token should be CLS
+        assert result["input_ids"][0, 0].item() == tokenizer.cls_token_id
+
+        # Check attention mask: 1s for real tokens, 0s for padding
+        # "Hello world" = 11 chars + CLS + SEP = 13 tokens
+        expected_real_tokens = 13
+        assert result["attention_mask"][0, :expected_real_tokens].sum().item() == expected_real_tokens
+        assert result["attention_mask"][0, expected_real_tokens:].sum().item() == 0
+
+    def test_tokenizer_encode_long_text(self):
+        """Test tokenizer truncates long text."""
+        from src.models.text_encoder import SimpleTokenizer
+        tokenizer = SimpleTokenizer()
+
+        long_text = "a" * 1000
+        result = tokenizer.encode(long_text, max_length=64)
+
+        # Should be truncated to max_length
+        assert result["input_ids"].shape == (1, 64)
+
 
 class TestFusionLayer:
     """Tests for multi-modal fusion layer."""

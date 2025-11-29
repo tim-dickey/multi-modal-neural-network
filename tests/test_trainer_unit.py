@@ -344,6 +344,143 @@ class TestDeviceManager:
         assert "DeviceManager" in repr_str
         assert "cpu" in repr_str
 
+    def test_device_property_raises_when_not_configured(self):
+        """Test device property raises RuntimeError when _device is None."""
+        config = {"hardware": {"device": "cpu"}}
+        dm = DeviceManager(config)
+        # Force _device to None to test the error path
+        dm._device = None
+        with pytest.raises(RuntimeError, match="Device not configured"):
+            _ = dm.device
+
+    def test_npu_device_config_falls_to_cpu(self, monkeypatch):
+        """Test NPU device configs fall back to CPU for training."""
+        npu_devices = ["npu", "openvino", "ryzenai", "privateuseone"]
+        for npu_device in npu_devices:
+            config = {"hardware": {"device": npu_device}}
+            dm = DeviceManager(config)
+            assert dm.device.type == "cpu", f"Expected CPU for {npu_device}"
+            assert dm.is_cpu is True
+
+    def test_mps_device_config_without_mps(self, monkeypatch):
+        """Test MPS device falls back to CPU when MPS not available."""
+        monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+        config = {"hardware": {"device": "mps"}}
+        dm = DeviceManager(config)
+        assert dm.device.type == "cpu"
+
+    def test_mps_device_config_with_mps(self, monkeypatch):
+        """Test MPS device is used when available."""
+        monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+        config = {"hardware": {"device": "mps"}}
+        dm = DeviceManager(config)
+        assert dm.device.type == "mps"
+        assert dm.is_mps is True
+
+    def test_auto_device_logs_cuda(self, monkeypatch, caplog):
+        """Test auto device selection logs CUDA info when CUDA available."""
+        from src.utils import gpu_utils, npu_utils
+
+        # Mock GPU detection
+        monkeypatch.setattr(
+            npu_utils,
+            "get_best_available_device",
+            lambda prefer_npu=False: "cuda"
+        )
+        monkeypatch.setattr(
+            gpu_utils,
+            "detect_gpu_info",
+            lambda: {"available": True, "devices": [{"name": "NVIDIA GTX 1080"}]}
+        )
+        monkeypatch.setattr(
+            gpu_utils,
+            "configure_device_for_training",
+            lambda device, gpu_id=None, verbose=False: torch.device("cpu")
+        )
+
+        config = {"hardware": {"device": "auto"}}
+        with caplog.at_level(logging.INFO):
+            dm = DeviceManager(config)
+        assert any("CUDA GPU" in r.message for r in caplog.records)
+
+    def test_auto_device_logs_npu(self, monkeypatch, caplog):
+        """Test auto device selection logs NPU info when NPU available."""
+        from src.utils import gpu_utils, npu_utils
+
+        # Mock NPU detection
+        monkeypatch.setattr(
+            npu_utils,
+            "get_best_available_device",
+            lambda prefer_npu=False: "openvino"
+        )
+        monkeypatch.setattr(
+            npu_utils,
+            "detect_npu_info",
+            lambda: {"available": True, "device_name": "Intel AI Boost NPU"}
+        )
+
+        config = {"hardware": {"device": "auto"}}
+        with caplog.at_level(logging.INFO):
+            dm = DeviceManager(config)
+        assert any("NPU" in r.message for r in caplog.records)
+
+    def test_auto_device_logs_cpu_warning(self, monkeypatch, caplog):
+        """Test auto device selection logs warning when only CPU available."""
+        from src.utils import gpu_utils, npu_utils
+
+        # Mock no GPU/NPU available
+        monkeypatch.setattr(
+            npu_utils,
+            "get_best_available_device",
+            lambda prefer_npu=False: "cpu"
+        )
+        monkeypatch.setattr(
+            gpu_utils,
+            "configure_device_for_training",
+            lambda device, gpu_id=None, verbose=False: torch.device("cpu")
+        )
+
+        config = {"hardware": {"device": "auto"}}
+        with caplog.at_level(logging.WARNING):
+            dm = DeviceManager(config)
+        assert any("No GPU or NPU detected" in r.message for r in caplog.records)
+
+    def test_create_grad_scaler_cuda(self, monkeypatch):
+        """Test GradScaler creation when CUDA is available."""
+        from src.utils import gpu_utils
+
+        # Create a DeviceManager then force it to think it's CUDA
+        config = {"hardware": {"device": "cpu"}}
+        dm = DeviceManager(config)
+        # Simulate CUDA device
+        dm._device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
+        if dm.is_cuda:
+            scaler = dm.create_grad_scaler()
+            assert scaler is not None
+            assert isinstance(scaler, torch.cuda.amp.GradScaler)
+
+    def test_log_detected_device_cuda_path(self, monkeypatch, caplog):
+        """Test _log_detected_device logs CUDA info correctly."""
+        import src.utils.gpu_utils as gpu_utils_module
+
+        # Create a DeviceManager with CPU to avoid GPU detection during init
+        config = {"hardware": {"device": "cpu"}}
+        dm = DeviceManager(config)
+
+        # Monkeypatch the detect_gpu_info function in the gpu_utils module
+        monkeypatch.setattr(
+            gpu_utils_module,
+            "detect_gpu_info",
+            lambda: {"available": True, "devices": [{"name": "NVIDIA RTX 3080"}]}
+        )
+
+        # Directly call _log_detected_device with "cuda"
+        with caplog.at_level(logging.INFO):
+            dm._log_detected_device("cuda")
+
+        assert any("CUDA GPU" in r.message and "RTX 3080" in r.message for r in caplog.records)
+
 
 # =============================================================================
 # CheckpointManager Tests
