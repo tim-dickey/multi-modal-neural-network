@@ -99,29 +99,49 @@ def _detect_external_npu_windows() -> tuple[bool, str | None]:
     return False, None
 
 
+def _detect_usb_npu_linux() -> tuple[bool, str | None]:
+    """Check for USB-connected NPUs on Linux using lsusb."""
+    if not shutil.which("lsusb"):
+        return False, None
+
+    result = _safe_run(["lsusb"], capture_output=True, text=True)
+    if not (result and result.returncode == 0 and getattr(result, "stdout", None)):
+        return False, None
+
+    output = result.stdout.lower()
+    if "movidius" in output or "neural compute stick" in output:
+        return True, "Intel Movidius NCS"
+    if "coral" in output or "edge tpu" in output:
+        return True, "Google Coral Edge TPU"
+    return False, None
+
+
+def _detect_pcie_npu_linux() -> tuple[bool, str | None]:
+    """Check for PCIe-connected NPUs on Linux using lspci."""
+    if not shutil.which("lspci"):
+        return False, None
+
+    result = _safe_run(["lspci"], capture_output=True, text=True)
+    if not (result and result.returncode == 0 and getattr(result, "stdout", None)):
+        return False, None
+
+    output = result.stdout.lower()
+    if "hailo" in output:
+        return True, "Hailo AI Accelerator"
+    if "coral" in output:
+        return True, "Google Coral Edge TPU"
+    return False, None
+
+
 def _detect_external_npu_linux() -> tuple[bool, str | None]:
     """Detect external NPUs on Linux using lsusb and lspci."""
-    # Check for USB devices (only run probe if the tool exists)
-    if shutil.which("lsusb"):
-        result = _safe_run(["lsusb"], capture_output=True, text=True)
-        if result and result.returncode == 0 and getattr(result, "stdout", None):
-            output = result.stdout.lower()
-            if "movidius" in output or "neural compute stick" in output:
-                return True, "Intel Movidius NCS"
-            if "coral" in output or "edge tpu" in output:
-                return True, "Google Coral Edge TPU"
+    # Check for USB devices first
+    found, device = _detect_usb_npu_linux()
+    if found:
+        return found, device
 
-    # Check for PCIe devices (Hailo, Coral M.2) when lspci is available
-    if shutil.which("lspci"):
-        result = _safe_run(["lspci"], capture_output=True, text=True)
-        if result and result.returncode == 0 and getattr(result, "stdout", None):
-            output = result.stdout.lower()
-            if "hailo" in output:
-                return True, "Hailo AI Accelerator"
-            if "coral" in output:
-                return True, "Google Coral Edge TPU"
-
-    return False, None
+    # Check for PCIe devices (Hailo, Coral M.2)
+    return _detect_pcie_npu_linux()
 
 
 def _detect_external_npu_darwin() -> tuple[bool, str | None]:
@@ -262,49 +282,99 @@ def _vendor_npu_info() -> dict[str, Any] | None:
     return None
 
 
+def _detect_intel_npu_windows() -> bool:
+    """Detect Intel NPU on Windows via PowerShell."""
+    if platform.system() != "Windows":
+        return False
+
+    try:
+        ps_cmd = (
+            "Get-PnpDevice | Where-Object {"
+            '\n  $_.FriendlyName -like "*NPU*" -or'
+            '\n  $_.FriendlyName -like "*VPU*" -or'
+            '\n  $_.FriendlyName -like "*AI Boost*"'
+            "\n}"
+        )
+        result = _run_powershell_pnp_probe(ps_cmd)
+        return bool(
+            result
+            and result.returncode == 0
+            and getattr(result, "stdout", None)
+            and result.stdout.strip()
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _detect_intel_npu_openvino() -> bool:
+    """Detect Intel NPU via OpenVINO."""
+    try:
+        if importlib_util.find_spec("openvino") is None:
+            return False
+
+        ov = importlib.import_module("openvino")
+        core = ov.Core()
+        devices = core.available_devices()
+        return any("VPU" in dev or "NPU" in dev for dev in devices)
+    except (ImportError, AttributeError, RuntimeError, OSError) as _err:
+        logger.debug("OpenVINO probe failed: %s", _err, exc_info=True)
+        return False
+
+
 def _detect_intel_npu() -> bool:
     """Detect Intel NPU (VPU/AI Boost).
 
     Returns True if an Intel VPU/NPU device appears available.
     """
     try:
-        # Check for Intel VPU via OpenVINO detection
-        # This is a placeholder - actual detection would require OpenVINO installed
+        # Check Windows Device Manager first
+        if _detect_intel_npu_windows():
+            return True
 
-        # Try to detect via Windows Device Manager (Windows only)
-        if platform.system() == "Windows":
-            try:
-                ps_cmd = (
-                    "Get-PnpDevice | Where-Object {"
-                    '\n  $_.FriendlyName -like "*NPU*" -or'
-                    '\n  $_.FriendlyName -like "*VPU*" -or'
-                    '\n  $_.FriendlyName -like "*AI Boost*"'
-                    "\n}"
-                )
-                result = _run_powershell_pnp_probe(ps_cmd)
-                if result and result.returncode == 0 and getattr(result, "stdout", None) and result.stdout.strip():
-                    return True
-            except (subprocess.TimeoutExpired, OSError):
-                # PowerShell not available or timed out
-                pass
-
-        # Try to import OpenVINO and check for VPU device via importlib
-        try:
-            if importlib_util.find_spec("openvino") is not None:
-                ov = importlib.import_module("openvino")
-                core = ov.Core()
-                devices = core.available_devices()
-                # Look for VPU or NPU device
-                for dev in devices:
-                    if "VPU" in dev or "NPU" in dev:
-                        return True
-        except (ImportError, AttributeError, RuntimeError, OSError) as _err:
-            # Any failure during the OpenVINO probe is non-fatal; log for debugging
-            logger.debug("OpenVINO probe failed: %s", _err, exc_info=True)
-
-        return False
+        # Try OpenVINO detection
+        return _detect_intel_npu_openvino()
 
     except (OSError, RuntimeError):
+        return False
+
+
+def _detect_amd_npu_windows() -> bool:
+    """Detect AMD NPU on Windows via PowerShell."""
+    if platform.system() != "Windows":
+        return False
+
+    processor_info = platform.processor().lower()
+    if "amd" not in processor_info or "ryzen" not in processor_info:
+        return False
+
+    try:
+        ps_cmd = (
+            "Get-PnpDevice | Where-Object {"
+            '\n  $_.FriendlyName -like "*Ryzen AI*" -or'
+            '\n  $_.FriendlyName -like "*AMD NPU*"'
+            "\n}"
+        )
+        result = _run_powershell_pnp_probe(ps_cmd)
+        return bool(
+            result
+            and result.returncode == 0
+            and getattr(result, "stdout", None)
+            and result.stdout.strip()
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _detect_amd_npu_sdk() -> bool:
+    """Detect AMD Ryzen AI SDK availability."""
+    try:
+        return importlib_util.find_spec("ryzen_ai") is not None
+    except (ImportError, AttributeError, RuntimeError, OSError) as _err:
+        logger.debug(
+            "AMD Ryzen AI SDK probe failed: %s",
+            _err,
+            exc_info=True,
+        )
         return False
 
 
@@ -314,39 +384,12 @@ def _detect_amd_npu() -> bool:
     Returns True if AMD Ryzen AI appears available on this system.
     """
     try:
-        processor_info = platform.processor().lower()
+        # Check Windows Device Manager first
+        if _detect_amd_npu_windows():
+            return True
 
-        # Check for AMD Ryzen AI in processor name and Windows Device Manager probe
-        if (
-            "amd" in processor_info
-            and "ryzen" in processor_info
-            and platform.system() == "Windows"
-        ):
-            try:
-                ps_cmd = (
-                    "Get-PnpDevice | Where-Object {"
-                    '\n  $_.FriendlyName -like "*Ryzen AI*" -or'
-                    '\n  $_.FriendlyName -like "*AMD NPU*"'
-                    "\n}"
-                )
-                result = _run_powershell_pnp_probe(ps_cmd)
-                if result and result.returncode == 0 and getattr(result, "stdout", None) and result.stdout.strip():
-                    return True
-            except (subprocess.TimeoutExpired, OSError):
-                pass
-
-        # Try to check for AMD Ryzen AI SDK via importlib
-        try:
-            if importlib_util.find_spec("ryzen_ai") is not None:
-                return True
-        except (ImportError, AttributeError, RuntimeError, OSError) as _err:
-            logger.debug(
-                "DirectML/torch_directml probe failed: %s",
-                _err,
-                exc_info=True,
-            )
-
-        return False
+        # Try AMD SDK detection
+        return _detect_amd_npu_sdk()
 
     except (OSError, RuntimeError):
         return False
