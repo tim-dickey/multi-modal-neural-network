@@ -1,4 +1,4 @@
-## PyTorch Upgrade: `torch>=2.8.0` / `torchvision>=0.20.0`
+## PyTorch Upgrade: `torch>=2.8.0` / `torchvision>=0.23.0`
 
 **Summary**
 - This PR proposes upgrading PyTorch to `>=2.8.0` and `torchvision` to `>=0.20.0` (candidate tested in smoke workflows).

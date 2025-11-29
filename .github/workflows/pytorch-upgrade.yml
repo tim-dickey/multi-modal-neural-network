@@ -26,7 +26,7 @@ jobs:
       - name: Install candidate PyTorch
         run: |
           # Candidate pin from upgrade branch
-          pip install --no-cache-dir torch>=2.8.0 torchvision>=0.20.0
+          pip install --no-cache-dir torch>=2.8.0 torchvision>=0.23.0
 
       - name: Install project (dev) dependencies
         run: |
