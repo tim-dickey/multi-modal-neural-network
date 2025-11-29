@@ -1,8 +1,9 @@
 """Main training loop for multi-modal neural network."""
 
 import logging
+from collections.abc import Sized
 from pathlib import Path
-from typing import Any, Dict, Optional, Sized, Tuple, cast
+from typing import Any, Dict, Optional, Tuple, cast
 
 import torch
 from torch.utils.data import DataLoader
@@ -11,15 +12,11 @@ from tqdm import tqdm
 from ..data.dataset import create_dataloader, create_dataset_from_config
 from ..data.selector import build_dataloaders
 from ..models.multi_modal_model import MultiModalModel, create_multi_modal_model
-from ..training.losses import MetaLoss, create_loss_function
-from ..training.optimizer import (
-    AdaptiveLRController,
-    GradientClipper,
-    create_optimizer,
-    create_scheduler,
-)
 from ..utils.config import load_config, save_config, validate_config
-from ..utils.logging import MetricsLogger, WandbLogger, log_model_info, setup_logger
+from ..utils.logging import log_model_info
+from .checkpoint_manager import CheckpointManager
+from .device_manager import DeviceManager
+from .training_state import LoggingManager, TrainingComponentsFactory, TrainingState
 
 
 class Trainer:
@@ -28,6 +25,13 @@ class Trainer:
     Supports two construction modes:
     1) Config-driven: provide `config_path` to build model and data loaders
     2) Injected objects: provide `model`, `train_loader`, `val_loader`, and `config`
+
+    Uses decomposed components for better maintainability:
+    - DeviceManager: Handles device detection and configuration
+    - CheckpointManager: Manages checkpoint saving/loading
+    - LoggingManager: Handles logging setup
+    - TrainingState: Tracks training progress
+    - TrainingComponentsFactory: Creates optimizer, scheduler, etc.
     """
 
     def __init__(
@@ -52,13 +56,26 @@ class Trainer:
         validate_config(self.config)
 
         # Predeclare a logger so it can be used during early device detection
-        # (we'll replace it with the configured logger after paths are resolved)
-        self.logger: logging.Logger = logging.getLogger("trainer")
+        self._temp_logger: logging.Logger = logging.getLogger("trainer")
 
-        # Setup device with GPU/NPU detection (helpers will use imports)
-        self._init_device_and_detection(device)
+        # Predeclare data loader and state attributes for type checkers
+        self.train_loader: Any = None
+        self.val_loader: Optional[Any] = None
+        self.test_loader: Optional[Any] = None
+        self.current_epoch: int = 0
+        self.global_step: int = 0
+        self.best_val_loss: float = float("inf")
+        self.scaler: Optional[torch.cuda.amp.GradScaler] = None
 
-        # Paths, logging, and experiment setup
+        # Setup device with GPU/NPU detection using DeviceManager
+        self.device_manager = DeviceManager(
+            config=self.config,
+            device_override=device,
+            logger=self._temp_logger,
+        )
+        self.device = self.device_manager.device
+
+        # Paths, logging, and experiment setup using LoggingManager
         self._init_paths_and_logging()
 
         # Resolve model and move to device
@@ -70,63 +87,18 @@ class Trainer:
         # Training components: losses, optimizer, scheduler, clipper, adapters
         self._init_training_components()
 
+        # Initialize checkpoint manager
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=self.checkpoint_dir,
+            logger=self.logger,
+        )
+
         # Mixed precision and resume
         self._init_amp_and_resume(resume_from)
 
         # Persist effective config
         self.output_dir.mkdir(parents=True, exist_ok=True)
         save_config(self.config, str(self.output_dir / "config.yaml"))
-
-    def _init_device_and_detection(self, device: Optional[str]) -> None:
-        """Initialize `self.device` using config and hardware detection helpers."""
-        from ..utils.gpu_utils import configure_device_for_training, detect_gpu_info
-        from ..utils.npu_utils import detect_npu_info, get_best_available_device
-
-        if device is None:
-            device_config = self.config.get("hardware", {}).get("device", "auto")
-            gpu_id = self.config.get("hardware", {}).get("gpu_id")
-            prefer_npu = self.config.get("hardware", {}).get("prefer_npu", False)
-
-            # Handle "auto" device selection
-            if device_config == "auto":
-                device_config = get_best_available_device(prefer_npu=prefer_npu)
-
-                # Log what was detected
-                if device_config == "cuda":
-                    gpu_info = detect_gpu_info()
-                    if gpu_info["available"]:
-                        self.logger.info(
-                            "Using CUDA GPU: %s", gpu_info["devices"][0]["name"]
-                        )
-                elif device_config in ["openvino", "ryzenai", "mps", "privateuseone"]:
-                    npu_info = detect_npu_info()
-                    self.logger.info("Using NPU: %s", npu_info.get("device_name"))
-                else:
-                    self.logger.warning(
-                        "No GPU or NPU detected. Training will use CPU. "
-                        "For GPU support, install PyTorch with CUDA. "
-                        "For NPU support, install an appropriate SDK "
-                        "(OpenVINO, DirectML, etc.)"
-                    )
-
-            # Handle NPU device strings
-            if device_config in ["npu", "openvino", "ryzenai", "privateuseone"]:
-                self.logger.info(
-                    "NPU detected (%s), using CPU for training. "
-                    "NPU can be used for optimized inference via ONNX export.",
-                    device_config,
-                )
-                self.device = torch.device("cpu")
-            elif device_config == "mps":
-                self.device = torch.device(
-                    "mps" if torch.backends.mps.is_available() else "cpu"
-                )
-            else:
-                self.device = configure_device_for_training(
-                    device=device_config, gpu_id=gpu_id, verbose=False
-                )
-        else:
-            self.device = torch.device(device if torch.cuda.is_available() else "cpu")
 
     def _init_paths_and_logging(self) -> None:
         """Create output, checkpoint, and log directories and initialize loggers."""
@@ -141,38 +113,19 @@ class Trainer:
                 "checkpoint_dir", str(self.output_dir / "checkpoints")
             )
         )
-        log_dir_path = Path(
-            self.config.get("paths", {}).get("log_dir", str(self.output_dir / "logs"))
-        )
+
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        log_dir_path.mkdir(parents=True, exist_ok=True)
 
-        # Setup logging (replace the temporary logger declared above)
-        self.logger = setup_logger(
-            name="trainer", log_file=str(log_dir_path / "training.log")
+        # Use LoggingManager for all logging setup
+        self.logging_manager = LoggingManager(
+            config=self.config,
+            output_dir=self.output_dir,
         )
+        self.logger = self.logging_manager.logger
+        self.metrics_logger = self.logging_manager.metrics_logger
+        self.wandb_logger = self.logging_manager.wandb_logger
+
         self.logger.info("Using device: %s", self.device)
-
-        # Setup metrics logger
-        experiment_name = self.config.get("logging", {}).get("experiment", "default")
-        self.metrics_logger = MetricsLogger(
-            log_dir=str(log_dir_path), experiment_name=experiment_name
-        )
-
-        # Setup wandb if enabled
-        use_wandb = self.config.get("logging", {}).get("use_wandb", True)
-        if use_wandb:
-            project_name = self.config.get("logging", {}).get(
-                "project", "multi-modal-net"
-            )
-            self.wandb_logger: Optional[WandbLogger] = WandbLogger(
-                project=project_name,
-                experiment=experiment_name,
-                config=self.config,
-                enabled=True,
-            )
-        else:
-            self.wandb_logger = None
 
     def _init_model(self, model: Optional[MultiModalModel]) -> None:
         """Create or accept provided model and move it to device."""
@@ -192,10 +145,6 @@ class Trainer:
         This method dispatches to focused helper methods to keep branching
         logic small and testable.
         """
-        self.train_loader: Any
-        self.val_loader: Optional[Any]
-        self.test_loader: Optional[Any]
-
         if train_loader is None and val_loader is None:
             data_section = self.config.get("data", {})
             if "datasets" in data_section:
@@ -262,41 +211,30 @@ class Trainer:
     def _init_training_components(self) -> None:
         """Create loss, optimizer, scheduler, gradient clipping and adaptive LR.
 
-        Split into smaller helpers to reduce cyclomatic complexity and make
-        unit-testing individual initialization blocks easier.
+        Uses TrainingComponentsFactory for consistent component creation.
         """
-        self._create_criterion_and_meta()
-        self._create_optimizer_and_scheduler()
-        self._create_clipping_adaptive_and_state()
-
-    def _create_criterion_and_meta(self) -> None:
-        """Create loss functions used during training."""
-        self.criterion = create_loss_function(self.config)
-        if getattr(self.model, "use_double_loop", False):
-            self.meta_criterion = MetaLoss()
-
-    def _create_optimizer_and_scheduler(self) -> None:
-        """Create optimizer and learning-rate scheduler."""
-        self.optimizer = create_optimizer(self.model, self.config)
-        steps_per_epoch = max(1, len(self.train_loader))
-        self.scheduler, self.scheduler_update_freq = create_scheduler(
-            self.optimizer, self.config, steps_per_epoch=steps_per_epoch
+        factory = TrainingComponentsFactory(
+            model=self.model,
+            config=self.config,
+            train_loader=self.train_loader,
+            logger=self.logger,
         )
 
-    def _create_clipping_adaptive_and_state(self) -> None:
-        """Setup gradient clipping, adaptive LR controller and training state."""
-        max_grad_norm = self.config.get("training", {}).get("max_grad_norm", 1.0)
-        self.grad_clipper = GradientClipper(max_norm=max_grad_norm)
+        components = factory.create_all()
 
-        if getattr(self.model, "use_double_loop", False):
-            self.adaptive_lr = AdaptiveLRController(
-                base_lr=self.config.get("training", {}).get("inner_lr", 3e-4)
-            )
+        self.criterion = components["criterion"]
+        self.meta_criterion = components["meta_criterion"]
+        self.optimizer = components["optimizer"]
+        self.scheduler = components["scheduler"]
+        self.scheduler_update_freq = components["scheduler_update_freq"]
+        self.grad_clipper = components["grad_clipper"]
+        self.adaptive_lr = components["adaptive_lr"]
 
-        # Initial training state
-        self.current_epoch = 0
-        self.global_step = 0
-        self.best_val_loss = float("inf")
+        # Initialize training state using TrainingState
+        self.training_state = TrainingState()
+        self.current_epoch = self.training_state.current_epoch
+        self.global_step = self.training_state.global_step
+        self.best_val_loss = self.training_state.best_val_loss
 
     def _init_amp_and_resume(self, resume_from: Optional[str]) -> None:
         """Initialize mixed-precision utilities and optionally resume from checkpoint."""
@@ -491,7 +429,7 @@ class Trainer:
 
         return loss, accuracy
 
-    @torch.no_grad()  # type: ignore[misc]
+    @torch.no_grad()
     def validate(self) -> Dict[str, float]:
         """Validation loop."""
         # If no validation loader, return neutral metrics
@@ -558,78 +496,49 @@ class Trainer:
         *,
         is_best: bool = False,
     ) -> None:
-        """Save model checkpoint.
+        """Save model checkpoint using CheckpointManager.
 
         - If `path` is provided, save directly to that path.
         - Otherwise, save to default locations under `checkpoint_dir`.
         """
-        checkpoint = {
-            "epoch": self.current_epoch if epoch is None else epoch,
-            "global_step": self.global_step if step is None else step,
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "scheduler_state_dict": self.scheduler.state_dict(),
-            "best_val_loss": self.best_val_loss,
-            "config": self.config,
-        }
-
-        if path is not None:
-            ckpt_path = Path(path)
-            ckpt_path.parent.mkdir(parents=True, exist_ok=True)
-            torch.save(checkpoint, ckpt_path)
-            self.logger.info(f"Checkpoint saved to {ckpt_path}")
-            return
-
-        # Default saving strategy
-        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        latest_path = self.checkpoint_dir / "latest.pt"
-        torch.save(checkpoint, latest_path)
-        # Also save model_state_dict as a safetensors file for safer loading
-        try:
-            from safetensors.torch import save_file as _st_save
-
-            safetensors_path = latest_path.with_suffix(".safetensors")
-            # save_file expects a mapping of name -> tensor
-            _st_save(checkpoint["model_state_dict"], str(safetensors_path))
-            self.logger.info(f"Also saved model_state_dict to {safetensors_path}")
-        except Exception:
-            # If safetensors is not available or save fails, continue silently
-            self.logger.debug("safetensors save skipped or failed; leaving .pt only")
-        if is_best:
-            best_path = self.checkpoint_dir / "best.pt"
-            torch.save(checkpoint, best_path)
-        self.logger.info(f"Checkpoint saved to {latest_path}")
+        self.checkpoint_manager.save(
+            model=self.model,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
+            epoch=self.current_epoch if epoch is None else epoch,
+            global_step=self.global_step if step is None else step,
+            best_val_loss=self.best_val_loss,
+            config=self.config,
+            path=path,
+            is_best=is_best,
+        )
 
     def load_checkpoint(self, checkpoint_path: str) -> None:
-        """Load model from checkpoint."""
-        self.logger.info(f"Loading checkpoint from {checkpoint_path}")
-
-        from ..utils.safe_load import safe_load_checkpoint
+        """Load model from checkpoint using CheckpointManager."""
         # Allow callers to opt-in to loading from external paths via config
         allow_external = self.config.get("security", {}).get(
             "allow_external_checkpoints", False
         )
 
-        checkpoint = safe_load_checkpoint(
-            checkpoint_path,
-            map_location=self.device,
-            expected_keys={
-                "model_state_dict",
-                "optimizer_state_dict",
-                "scheduler_state_dict",
-                "epoch",
-                "global_step",
-                "best_val_loss",
-                "config",
-            },
+        checkpoint = self.checkpoint_manager.load(
+            checkpoint_path=checkpoint_path,
+            device=self.device,
             allow_external=allow_external,
         )
 
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        self.current_epoch = checkpoint["epoch"] + 1
-        self.global_step = checkpoint["global_step"]
-        self.best_val_loss = checkpoint["best_val_loss"]
+        restored_state = self.checkpoint_manager.restore_training_state(
+            checkpoint=checkpoint,
+            model=self.model,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
+        )
 
-        self.logger.info(f"Resumed from epoch {self.current_epoch}")
+        # Update trainer state
+        self.current_epoch = restored_state["epoch"]
+        self.global_step = restored_state["global_step"]
+        self.best_val_loss = restored_state["best_val_loss"]
+
+        # Also update TrainingState
+        self.training_state.current_epoch = self.current_epoch
+        self.training_state.global_step = self.global_step
+        self.training_state.best_val_loss = self.best_val_loss
