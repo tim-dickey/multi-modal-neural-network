@@ -1,6 +1,7 @@
 """Main multi-modal neural network model with double-loop learning."""
 
 from typing import Any, Dict, Optional
+import logging
 
 import torch
 import torch.nn as nn
@@ -367,7 +368,7 @@ def load_pretrained_weights(
         if "model_state_dict" in vision_state:
             vision_state = vision_state["model_state_dict"]
         model.vision_encoder.load_state_dict(vision_state, strict=strict)
-        print(f"Loaded vision encoder from {vision_checkpoint}")
+        logging.getLogger(__name__).info("Loaded vision encoder from %s", vision_checkpoint)
 
     if text_checkpoint is not None:
         from ..utils.safe_load import safe_load_checkpoint
@@ -378,6 +379,6 @@ def load_pretrained_weights(
         if "model_state_dict" in text_state:
             text_state = text_state["model_state_dict"]
         model.text_encoder.load_state_dict(text_state, strict=strict)
-        print(f"Loaded text encoder from {text_checkpoint}")
+        logging.getLogger(__name__).info("Loaded text encoder from %s", text_checkpoint)
 
     return model

@@ -9,9 +9,12 @@ cannot be executed on the host.
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_subprocess_run(
@@ -52,7 +55,9 @@ def _safe_subprocess_run(
         # Propagate timeouts so callers can handle them
         raise
     except FileNotFoundError:
+        logger.debug("_safe_subprocess_run: executable not found: %s", cmd[0])
         return None
     except OSError:
         # OS-level errors (permission, resource limits, etc.) — fail safely
+        logger.debug("_safe_subprocess_run: OSError running %s", cmd, exc_info=True)
         return None

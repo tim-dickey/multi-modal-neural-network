@@ -504,16 +504,21 @@ def check_mixed_precision_support() -> dict[str, bool]:
     # FP16 is generally supported on all CUDA devices
     support["fp16"] = True
 
-    # BF16 requires compute capability >= 8.0 (Ampere and newer)
-    device_props = torch.cuda.get_device_properties(0)
-    compute_capability = (device_props.major, device_props.minor)
+    # Guard access to device properties: ensure at least one CUDA device exists
+    try:
+        if torch.cuda.device_count() > 0:
+            device_props = torch.cuda.get_device_properties(0)
+            compute_capability = (device_props.major, device_props.minor)
 
-    if compute_capability >= (8, 0):
-        support["bf16"] = True
+            if compute_capability >= (8, 0):
+                support["bf16"] = True
 
-    # TF32 is available on Ampere (8.0) and newer
-    if compute_capability >= (8, 0):
-        support["tf32"] = True
+            # TF32 is available on Ampere (8.0) and newer
+            if compute_capability >= (8, 0):
+                support["tf32"] = True
+    except Exception:
+        # Fail-safe: leave support flags as default False for bf16/tf32
+        pass
 
     return support
 
