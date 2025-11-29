@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check for Codacy token
         env:
@@ -159,7 +159,7 @@ jobs:
 
       - name: Upload Codacy CLI output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: codacy-cli-output
           path: |
