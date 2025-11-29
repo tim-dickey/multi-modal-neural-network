@@ -139,6 +139,7 @@ The User Guide includes Mermaid diagrams for system architecture, training pipel
 |----------|-------------|
 | **[Software Development Best Practices](Software%20development%20best%20practices.md)** | Coding standards, testing guidelines, and quality assurance practices |
 | **[PRD Assessment](docs/PRD_ASSESSMENT.md)** | Product Requirements Document with project scope and specifications |
+| **[Product Development Requirements](Open-source%20multi-modal%20small%20neural%20network%20v1.md)** | Original product development requirements and technical specifications |
 
 ## Environment Setup
 
