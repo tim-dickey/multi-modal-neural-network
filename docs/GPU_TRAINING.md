@@ -2,6 +2,41 @@
 
 This guide explains how to configure GPU training for the Multi-Modal Neural Network project.
 
+## Device Selection Flow
+
+```mermaid
+flowchart TD
+    START[Start Training] --> AUTO{device = 'auto'?}
+    
+    AUTO -->|Yes| DETECT[Detect Hardware]
+    AUTO -->|No| MANUAL[Use Specified Device]
+    
+    DETECT --> CUDA{CUDA Available?}
+    CUDA -->|Yes| MULTI{Multiple GPUs?}
+    CUDA -->|No| MPS{Apple MPS?}
+    
+    MULTI -->|Yes| SELECT[Select by gpu_id]
+    MULTI -->|No| USE_CUDA[Use cuda:0]
+    
+    MPS -->|Yes| USE_MPS[Use MPS]
+    MPS -->|No| NPU{NPU Available?}
+    
+    NPU -->|Yes| USE_NPU[Use NPU]
+    NPU -->|No| USE_CPU[Use CPU]
+    
+    SELECT --> TRAIN[Begin Training]
+    USE_CUDA --> TRAIN
+    USE_MPS --> TRAIN
+    USE_NPU --> TRAIN
+    USE_CPU --> TRAIN
+    MANUAL --> TRAIN
+    
+    style USE_CUDA fill:#4CAF50
+    style USE_MPS fill:#4CAF50
+    style USE_NPU fill:#FFC107
+    style USE_CPU fill:#FF9800
+```
+
 ## Automatic GPU Detection
 
 The project now includes automatic GPU detection and configuration. The system will:

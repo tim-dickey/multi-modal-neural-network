@@ -1,12 +1,11 @@
 import subprocess
-import platform
 
 from src.utils import npu_utils
 
 
 def test_detect_external_npu_linux(monkeypatch):
     # Force Linux path
-    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    monkeypatch.setattr(npu_utils.platform, "system", lambda: "Linux")
 
     # Pretend lsusb exists and returns Coral in stdout
     monkeypatch.setattr(npu_utils.shutil, "which", lambda x: "/usr/bin/lsusb" if x in ("lsusb", "lspci") else None)

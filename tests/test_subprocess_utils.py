@@ -46,7 +46,7 @@ class TestSafeSubprocessRun:
         monkeypatch.setattr("shutil.which", lambda cmd: "/usr/bin/fakecmd")
 
         def fake_run(cmd, capture_output=True, text=True, timeout=1, check=False, cwd=None, **kwargs):
-            raise subprocess.TimeoutExpired(cmd, timeout)
+            raise subprocess.TimeoutExpired("fakecmd", timeout)  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
@@ -88,10 +88,10 @@ class TestSafeSubprocessRun:
 
         cwd_used = None
 
-        def fake_run(cmd, capture_output=True, text=True, timeout=5, check=False, cwd=None, **kwargs):
+        def fake_run(_cmd, cwd=None, **_kwargs):
             nonlocal cwd_used
             cwd_used = cwd
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ok")
+            return subprocess.CompletedProcess(args=["fakecmd"], returncode=0, stdout="ok")  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 
@@ -108,7 +108,7 @@ class TestSafeSubprocessRun:
         def fake_run(cmd, **kwargs):
             nonlocal cmd_used
             cmd_used = cmd
-            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="ok")
+            return subprocess.CompletedProcess(args=["cmd"], returncode=0, stdout="ok")  # nosec B603 - test mock
 
         monkeypatch.setattr("subprocess.run", fake_run)
 

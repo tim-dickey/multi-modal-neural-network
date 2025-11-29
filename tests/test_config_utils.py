@@ -1,6 +1,4 @@
-import os
 from pathlib import Path
-import yaml
 
 from src.utils.config import (
     load_config,
@@ -10,7 +8,6 @@ from src.utils.config import (
     merge_configs,
     validate_config,
     ConfigNamespace,
-    get_project_root,
 )
 
 

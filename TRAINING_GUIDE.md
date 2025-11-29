@@ -2,6 +2,44 @@
 
 This guide provides instructions for training and using the multi-modal neural network.
 
+## Training Overview
+
+```mermaid
+flowchart TD
+    subgraph Setup["1️⃣ Setup"]
+        INSTALL[Install Dependencies]
+        CONFIG[Configure Settings]
+        HW[Hardware Detection]
+    end
+    
+    subgraph Data["2️⃣ Data Preparation"]
+        DS[(Select Datasets)]
+        SPLIT[Train/Val/Test Split]
+        AUG[Configure Augmentation]
+    end
+    
+    subgraph Train["3️⃣ Training"]
+        INIT[Initialize Model]
+        LOOP[Training Loop]
+        CKPT[Save Checkpoints]
+        VAL[Validation]
+    end
+    
+    subgraph Deploy["4️⃣ Deployment"]
+        EVAL[Evaluate Model]
+        EXPORT[Export to ONNX]
+        INF[Run Inference]
+    end
+    
+    INSTALL --> CONFIG --> HW
+    HW --> DS --> SPLIT --> AUG
+    AUG --> INIT --> LOOP
+    LOOP --> CKPT
+    LOOP --> VAL
+    VAL --> LOOP
+    CKPT --> EVAL --> EXPORT --> INF
+```
+
 ## Quick Start
 
 ### 1. Installation
@@ -753,32 +791,63 @@ flake8 src/ tests/
 Run the test suite to ensure code quality:
 
 ```bash
-# Run all tests
-pytest tests/
+# Run all tests (using make)
+make test
 
 # Run with coverage
+make test-cov
+
+# Run using pytest directly
+pytest tests/
+
+# Run with coverage report
 pytest tests/ --cov=src --cov-report=html
 
 # Run specific test file
 pytest tests/test_trainer.py
+
+# Run integration tests
+pytest tests/test_integration.py -v
 ```
 
 ### Pre-commit Checks
 
-Before pushing changes, run the full quality check:
+The project uses pre-commit hooks for automated code quality checks:
 
 ```bash
+# Install pre-commit hooks (one-time setup)
+pip install pre-commit
+pre-commit install
+
+# Run all quality checks using make
+make lint
+
+# Or run manually
+pre-commit run --all-files
+
 # Type check
 mypy src/ --show-error-codes
 
-# Format and lint
+# Format and lint (using make)
+make format
+
+# Or manually
 black src/ tests/
 isort src/ tests/
+ruff check src/ tests/
 flake8 src/ tests/
 
-# Run tests
-pytest tests/
+# Security scan
+bandit -r src/
 ```
+
+### Continuous Integration
+
+The project uses GitHub Actions for CI/CD:
+- **Multi-version testing**: Tests run on Python 3.11, 3.12, and 3.13
+- **Coverage reporting**: Automatic coverage reports on pull requests
+- **Dependency caching**: Fast CI builds with pip cache
+- **Pre-commit checks**: Automated linting and formatting
 
 ## Troubleshooting
 

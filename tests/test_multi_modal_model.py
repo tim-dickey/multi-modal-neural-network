@@ -1,7 +1,4 @@
 import torch
-import types
-import tempfile
-import os
 
 import pytest
 

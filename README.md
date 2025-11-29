@@ -3,6 +3,8 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-red.svg)](https://pytorch.org/)
+[![Tests](https://img.shields.io/badge/tests-446%20passing-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](htmlcov/index.html)
 
 This repository contains an open-source implementation of a multi-modal small neural network that incorporates double-loop learning mechanisms and integrates with external APIs for computational knowledge enhancement. The system is designed to train on consumer-grade hardware while maintaining acceptable performance and accuracy.
 
@@ -57,7 +59,18 @@ This repository contains an open-source implementation of a multi-modal small ne
    pip install -r requirements.txt
    ```
 
-4. (Optional) Install with Poetry:
+4. (Optional) Set up development tools:
+   ```bash
+   # Install pre-commit hooks for code quality
+   pip install pre-commit
+   pre-commit install
+   
+   # Verify installation
+   make test  # Run tests
+   make lint  # Check code quality
+   ```
+
+5. (Optional) Install with Poetry:
    ```bash
    poetry install
    ```
@@ -173,6 +186,114 @@ multi-modal-neural-network/
 │   └── NPU_TRAINING.md            # NPU configuration guide
 └── examples/                      # Usage examples
 ```
+
+## Architecture Overview
+
+### Model Architecture
+
+```mermaid
+graph TB
+    subgraph Input["Input Layer"]
+        IMG[🖼️ Image Input]
+        TXT[📝 Text Input]
+    end
+    
+    subgraph Encoders["Encoders"]
+        VE[Vision Encoder<br/>ViT]
+        TE[Text Encoder<br/>BERT]
+    end
+    
+    subgraph Fusion["Multi-Modal Fusion"]
+        FL[Fusion Layer<br/>Cross-Attention]
+        DLC[Double-Loop<br/>Controller]
+    end
+    
+    subgraph Heads["Task Heads"]
+        CLS[Classification<br/>Head]
+        GEN[Generation<br/>Head]
+        RET[Retrieval<br/>Head]
+    end
+    
+    IMG --> VE
+    TXT --> TE
+    VE --> FL
+    TE --> FL
+    FL <--> DLC
+    FL --> CLS
+    FL --> GEN
+    FL --> RET
+    
+    subgraph External["External Knowledge"]
+        WA[🔗 Wolfram Alpha<br/>API]
+    end
+    
+    DLC <-.-> WA
+```
+
+### Training Pipeline
+
+```mermaid
+flowchart LR
+    subgraph Data["Data Pipeline"]
+        DS[(Dataset)]
+        DL[DataLoader]
+        AUG[Augmentation]
+    end
+    
+    subgraph Training["Training Loop"]
+        FWD[Forward Pass]
+        LOSS[Loss Calculation]
+        BWD[Backward Pass]
+        OPT[Optimizer Step]
+    end
+    
+    subgraph Monitoring["Monitoring"]
+        CKPT[Checkpointing]
+        LOG[Logging]
+        EVAL[Validation]
+    end
+    
+    DS --> DL --> AUG --> FWD
+    FWD --> LOSS --> BWD --> OPT
+    OPT --> FWD
+    
+    OPT --> CKPT
+    OPT --> LOG
+    OPT -.-> EVAL
+```
+
+### Development Workflow
+
+```mermaid
+flowchart TD
+    subgraph Local["Local Development"]
+        CODE[Write Code]
+        PRE[Pre-commit Hooks<br/>ruff, bandit, pytest]
+        TEST[Run Tests<br/>make test]
+    end
+    
+    subgraph CI["CI/CD Pipeline"]
+        PUSH[Push to GitHub]
+        GHA[GitHub Actions]
+        PY311[Python 3.11]
+        PY312[Python 3.12]
+        PY313[Python 3.13]
+        COV[Coverage Report]
+    end
+    
+    subgraph Review["Code Review"]
+        PR[Pull Request]
+        REV[Review]
+        MERGE[Merge to Main]
+    end
+    
+    CODE --> PRE --> TEST --> PUSH
+    PUSH --> GHA
+    GHA --> PY311 & PY312 & PY313
+    PY311 & PY312 & PY313 --> COV
+    COV --> PR --> REV --> MERGE
+```
+
 ## API Integration Framework
 
 The project includes a flexible API integration framework designed for external knowledge sources:
@@ -475,21 +596,57 @@ The type checking is configured in `pyproject.toml` with strict settings includi
 
 Run the test suite:
 ```bash
+# Quick test run (using make)
+make test
+
+# Run all tests with coverage
+make test-cov
+
+# Run tests with pytest directly
 pytest tests/
+
+# Run with coverage report
+pytest --cov=src --cov-report=term-missing
+
+# Run integration tests
+pytest tests/test_integration.py -v
 ```
+
+**Test Coverage:** The project maintains **93% test coverage** (446 tests) across all modules.
 
 ### Code Quality
 
-Format code:
+We use automated code quality tools with pre-commit hooks:
+
 ```bash
+# Install pre-commit hooks (one-time setup)
+pip install pre-commit
+pre-commit install
+
+# Run all quality checks
+make lint
+
+# Format code (using make)
+make format
+
+# Manual formatting
 black src/ tests/
 isort src/ tests/
+
+# Lint code
+ruff check src/ tests/
+flake8 src/ tests/
+
+# Security scan
+bandit -r src/
 ```
 
-Lint code:
-```bash
-flake8 src/ tests/
-```
+### CI/CD
+
+The project uses GitHub Actions for continuous integration:
+- **Multi-version testing**: Python 3.11, 3.12, 3.13
+- **Coverage reporting**: Automatic coverage reports on PRs
+- **Dependency caching**: Fast CI builds with pip caching
 
 ## Contributing
 

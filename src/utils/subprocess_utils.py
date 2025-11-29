@@ -43,7 +43,7 @@ def _safe_subprocess_run(
     cmd = [exe, *cmd[1:]]
 
     try:
-        return subprocess.run(
+        return subprocess.run(  # nosec B603 - cmd is validated list, exe resolved via shutil.which
             cmd,
             capture_output=capture_output,
             text=text,
