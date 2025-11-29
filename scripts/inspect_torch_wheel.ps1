@@ -1,9 +1,9 @@
-# Download and inspect Torch 2.6.2 wheels locally (PowerShell)
+# Download and inspect Torch 2.8.0+ wheels locally (PowerShell)
 # Usage: .\.venv\Scripts\Activate.ps1; pwsh ./scripts/inspect_torch_wheel.ps1
 
 param(
-    [string]$TorchVersion = "2.6.2",
-    [string]$TorchVisionVersion = "0.16.2",
+    [string]$TorchVersion = "2.8.0",
+    [string]$TorchVisionVersion = "0.20.0",
     [string]$DownloadDir = "$env:TEMP\torch-wheels"
 )
 
