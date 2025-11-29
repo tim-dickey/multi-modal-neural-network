@@ -458,7 +458,8 @@ class TestDeviceManager:
         if dm.is_cuda:
             scaler = dm.create_grad_scaler()
             assert scaler is not None
-            assert isinstance(scaler, torch.cuda.amp.GradScaler)
+            # Use unified torch.amp.GradScaler (PyTorch 2.4+)
+            assert isinstance(scaler, torch.amp.GradScaler)
 
     def test_log_detected_device_cuda_path(self, monkeypatch, caplog):
         """Test _log_detected_device logs CUDA info correctly."""

@@ -66,7 +66,7 @@ class Trainer:
         self.current_epoch: int = 0
         self.global_step: int = 0
         self.best_val_loss: float = float("inf")
-        self.scaler: Optional[torch.cuda.amp.GradScaler] = None
+        self.scaler: Optional[torch.amp.GradScaler] = None
 
         # Setup device with GPU/NPU detection using DeviceManager
         self.device_manager = DeviceManager(
@@ -246,9 +246,8 @@ class Trainer:
         if self.use_amp:
             # Use the modern torch.amp API. Only enable GradScaler for CUDA devices.
             if getattr(self.device, "type", "cpu") == "cuda":
-                # Use the device-aware GradScaler API
-                # Use the cuda-specific GradScaler in torch.cuda.amp for compatibility
-                self.scaler = torch.cuda.amp.GradScaler()
+                # Use the unified torch.amp.GradScaler API (PyTorch 2.4+)
+                self.scaler = torch.amp.GradScaler("cuda")
             else:
                 # No CUDA device: avoid creating a CUDA GradScaler
                 self.scaler = None

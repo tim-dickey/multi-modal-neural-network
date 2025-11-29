@@ -147,14 +147,15 @@ class DeviceManager:
             for k, v in batch.items()
         }
 
-    def create_grad_scaler(self) -> Optional[torch.cuda.amp.GradScaler]:
+    def create_grad_scaler(self) -> Optional[torch.amp.GradScaler]:
         """Create a GradScaler for mixed precision training if applicable.
 
         Returns:
             GradScaler for CUDA devices, None otherwise
         """
         if self.is_cuda:
-            return torch.cuda.amp.GradScaler()
+            # Use unified torch.amp.GradScaler API (PyTorch 2.4+)
+            return torch.amp.GradScaler("cuda")
         return None
 
     def get_autocast_context(self, dtype: Optional[torch.dtype] = None):

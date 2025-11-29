@@ -478,8 +478,9 @@ GPUs excel at:
 1. **Unsupported Operations**:
    ```python
    # Check which ops are problematic
+   # opset_version=18 is the default for PyTorch 2.8+
    torch.onnx.export(model, dummy_input, "model.onnx", 
-                     verbose=True, opset_version=13)
+                     verbose=True, opset_version=18)
    ```
 
 2. **Dynamic Shapes**:
