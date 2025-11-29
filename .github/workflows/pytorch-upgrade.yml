@@ -68,7 +68,7 @@ jobs:
       - name: Download Torch wheels (no install)
         run: |
           mkdir -p /tmp/wheels
-          python -m pip download "torch>=2.8.0" "torchvision>=0.20.0" --no-deps -d /tmp/wheels || true
+          python -m pip download "torch==2.8.0" "torchvision==0.20.0" --no-deps -d /tmp/wheels || true
           ls -lah /tmp/wheels || true
 
       - name: Inspect wheel contents for native libs
