@@ -3,7 +3,6 @@
 ## Supported Versions
 
 The following versions of the multi-modal neural network project currently receive security updates:
-Only versions 5.1.x and 4.0.x are supported. Older versions are not supported.
 
 | Version | Supported          |
 | ------- | ------------------ |
