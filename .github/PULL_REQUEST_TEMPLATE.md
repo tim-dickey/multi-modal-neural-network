@@ -23,7 +23,7 @@
 ## Testing
 
 - [ ] I have run the existing test suite (`pytest` / `make test`) and all tests pass.
-- [ ] I have added or updated tests that cover the changed behaviour.
+- [ ] I have added or updated tests that cover the changed behavior.
 - [ ] I have manually verified the change (describe how below).
 
 <!-- Describe your manual testing steps, sample commands, or notebook outputs. -->

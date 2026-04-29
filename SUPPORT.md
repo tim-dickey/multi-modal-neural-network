@@ -16,7 +16,7 @@ If the documentation doesn't answer your question, open a
 preferred channel for:
 
 - Usage questions ("How do I…?")
-- Help understanding model outputs or training behaviour
+- Help understanding model outputs or training behavior
 - General feedback and ideas
 
 Please search existing discussions before opening a new one.
