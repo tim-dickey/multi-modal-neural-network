@@ -28,7 +28,7 @@ dependencies = [
     "safetensors>=0.4.0",
     "numpy>=1.24.0",
     "scipy>=1.11.0",
-    "scikit-learn>=1.5.0",
+    "scikit-learn>=1.7.2",
     "tqdm>=4.66.3",
     "requests>=2.32.4,<3",
 ]
